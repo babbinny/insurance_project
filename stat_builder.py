@@ -5,8 +5,8 @@
 입력: 아래 5개 시트가 들어 있는 엑셀 파일 (양식 파일 그대로)
     1번 시트  통계테이블 작성 대상  ← 여기에 결과가 채워짐
     2번 시트  통계테이블 기존      (개정 전 테이블)
-    3번 시트  주보종코드-개별상품코드 관계 테이블 (주보종명, SP_SPCD, 개별상품명, SP_SPCD1)
-              ※ 상품명은 각 코드 칼럼 바로 왼쪽 칼럼에 둡니다 (칼럼명은 무엇이든 됨)
+    3번 시트  주보종코드-개별상품코드 관계 테이블 (주보종명, 개별상품명, SP_SPCD, SP_SPCD1)
+              ※ 상품명 두 칼럼은 SP_SPCD 바로 왼쪽에 주보종명, 개별상품명 순서로 둡니다
     4번 시트  변경전,후 상품코드 (변경전, 변경후)
     5번 시트  급부코드 체계 (급부코드, 급부명)
 
@@ -48,7 +48,7 @@ SHEET_CODE = 4
 TABLE_COLS = ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1",
               "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"]
 REL_MAIN, REL_SP = "SP_SPCD", "SP_SPCD1"      # 관계 테이블 칼럼명
-REL_MAIN_NAME, REL_SP_NAME = "주보종명", "개별상품명"   # 각 코드 바로 왼쪽 칼럼(상품명)을 검토 시트에 표시할 이름
+REL_MAIN_NAME, REL_SP_NAME = "주보종명", "개별상품명"   # 상품명 칼럼명 (검토 시트에도 이 이름으로 표시)
 MAP_BEFORE, MAP_AFTER = "변경전", "변경후"      # 변경전/후 칼럼명
 CODE_COL, CODE_NAME_COL = "급부코드", "급부명"
 
@@ -89,13 +89,18 @@ def read_rows(ws, hdr_row, cols):
     return out
 
 
-def name_col_left_of(code_col, code_cols):
-    """코드 칼럼 바로 왼쪽 칼럼 = 그 코드의 상품명 칼럼 (칼럼명이 '상품명'으로 같아도 위치로 구분).
-    왼쪽에 칼럼이 없거나 다른 코드 칼럼이면 None"""
-    c = code_col - 1
-    if c < 1 or c in code_cols:
-        return None
-    return c
+def rel_name_cols(all_cols, code_cols):
+    """관계 시트의 상품명 칼럼 → (주보종명 열, 개별상품명 열).
+    1) 칼럼명이 '주보종명', '개별상품명' 이면 그 칼럼
+    2) 아니면 SP_SPCD 바로 왼쪽 두 칼럼을 순서대로 (칼럼명이 둘 다 '상품명'이어도 위치로 구분)
+    못 찾으면 None"""
+    if REL_MAIN_NAME in all_cols and REL_SP_NAME in all_cols:
+        return all_cols[REL_MAIN_NAME], all_cols[REL_SP_NAME]
+    first = min(code_cols)
+    a, b = first - 2, first - 1
+    if a >= 1 and a not in code_cols and b not in code_cols:
+        return a, b
+    return None, None
 
 
 def extra_cols(all_cols, used):
@@ -121,13 +126,12 @@ def build(in_path, out_dir, log=print):
     r_hdr, r_cols, r_all = find_header(ws_r, [REL_MAIN, REL_SP], ws_r.title)
     m_hdr, m_cols, m_all = find_header(ws_m, [MAP_BEFORE, MAP_AFTER], ws_m.title)
     r_codes = [r_cols[REL_MAIN], r_cols[REL_SP]]
-    r_name_main = name_col_left_of(r_cols[REL_MAIN], r_codes)
-    r_name_sp = name_col_left_of(r_cols[REL_SP], r_codes)
+    r_name_main, r_name_sp = rel_name_cols(r_all, r_codes)
     r_used = set(r_codes) | {c for c in (r_name_main, r_name_sp) if c}
     r_extra = {n: c for n, c in r_all.items() if c not in r_used}     # 그 밖의 칼럼은 검토 시트 끝에 함께 표시
-    missing = [c for c, n in ((REL_MAIN, r_name_main), (REL_SP, r_name_sp)) if not n]
-    if missing:
-        log(f"  (참고) [{ws_r.title}] 시트의 {', '.join(missing)} 왼쪽에 상품명 칼럼이 없어 상품명 없이 진행합니다.")
+    if not r_name_main:
+        log(f"  (참고) [{ws_r.title}] 시트에서 상품명 칼럼(SP_SPCD 왼쪽 두 칼럼: 주보종명, 개별상품명)을 "
+            f"찾지 못해 상품명 없이 진행합니다.")
 
     old_rows = read_rows(ws_o, o_hdr, o_cols)
     rel = []
