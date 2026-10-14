@@ -140,7 +140,7 @@ button.link { border: none; background: none; padding: 4px; color: var(--teal); 
 .more { padding: 8px 16px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); }
 
 /* 기능 탭 */
-.tooltabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 26px; border-bottom: 3px solid var(--teal); }
+.tooltabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 26px; border-bottom: 3px solid var(--teal); }
 .tooltab { text-align: left; padding: 16px 22px; border: 1px solid var(--line-strong); border-bottom: none; background: var(--panel); color: var(--muted); display: grid; gap: 2px; }
 .tooltab + .tooltab { border-left: none; }
 .tooltab b { font-size: 1.15rem; font-weight: 700; color: var(--ink-strong); }
@@ -175,6 +175,7 @@ tr.marked td:not(.rowno) { color: var(--ink-strong); }
   .steps { grid-template-columns: minmax(0, 1fr); }
   .tooltab { padding: 12px 14px; }
   .tooltab small { display: none; }
+  .tooltab b { font-size: 0.98rem; }
   .step + .step { border-left: none; border-top: 1px solid var(--line); }
 }
 @media (max-width: 640px) {
@@ -190,6 +191,30 @@ tr.marked td:not(.rowno) { color: var(--ink-strong); }
 @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } html { scroll-behavior: auto; } }
 html { scroll-behavior: smooth; }
 .gnb nav a.cur { color: var(--teal); border-bottom-color: var(--teal); }
+
+/* 약관 정보 */
+.info-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; padding: 14px 18px; background: var(--panel); border-top: 2px solid var(--ink-strong); }
+.info-bar input[type="search"] { border: 1px solid var(--line-strong); padding: 8px 12px; font-size: 0.92rem; min-width: 0; width: 260px; max-width: 100%; }
+.prod { margin-top: 22px; display: grid; gap: 8px; }
+.prod h3 { font-size: 1.15rem; font-weight: 700; color: var(--teal); }
+.prod .meta { font-size: 0.85rem; color: var(--muted); }
+.info-wrap { overflow-x: auto; border-top: 2px solid var(--teal); }
+.info { border-collapse: collapse; width: 100%; min-width: 820px; font-size: 0.9rem; }
+.info th { position: static; background: var(--teal-pale); text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+.info td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: normal; }
+.info td.ben { width: 17%; }
+.info td.why { width: 30%; color: var(--ink); }
+.info td.amt { width: 25%; }
+.info td.wait, .info td.res { width: 14%; }
+.info .main { font-weight: 500; color: var(--ink-strong); }
+.info .big { font-size: 1.05rem; font-weight: 700; color: var(--ink-strong); }
+.info .sub { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+.info .flag { display: inline-block; margin-top: 6px; padding: 1px 7px; font-size: 0.75rem; background: var(--check); color: var(--check-ink); }
+.info .memo { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--check-ink); }
+.info .yes { color: var(--teal); }
+.info .no { color: var(--muted); }
+.info .unk { color: var(--check-ink); background: var(--check); padding: 0 4px; }
+.info tr.hide { display: none; }
 </style>
 
 <header class="gnb">
@@ -198,6 +223,7 @@ html { scroll-behavior: smooth; }
     <nav aria-label="기능">
       <a href="#extract" data-tool-link="extract">약관에서 추출</a>
       <a href="#revise" data-tool-link="revise">개정 후 자동화</a>
+      <a href="#info" data-tool-link="info">약관 정보</a>
     </nav>
     <div class="state" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">준비 중</span></div>
   </div>
@@ -218,6 +244,7 @@ html { scroll-behavior: smooth; }
           <ul class="sub">
             <li><a href="#extract" data-tool-link="extract">약관에서 추출</a></li>
             <li><a href="#revise" data-tool-link="revise">개정 후 자동화</a></li>
+            <li><a href="#info" data-tool-link="info">약관 정보</a></li>
           </ul>
         </li>
       </ul>
@@ -231,7 +258,10 @@ html { scroll-behavior: smooth; }
           <b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small>
         </button>
         <button type="button" class="tooltab" role="tab" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
-          <b>개정 후 자동화</b><small>기존 통계테이블 + 상품코드 변경 → 개정 후 테이블</small>
+          <b>개정 후 자동화</b><small>기존 테이블 + 상품코드 변경 → 개정 후 테이블</small>
+        </button>
+        <button type="button" class="tooltab" role="tab" id="tab-info" data-tool="info" aria-controls="panel-info">
+          <b>약관 정보</b><small>급부별 보험금 · 면책기간 · 적립금 요약</small>
         </button>
       </div>
 
@@ -349,12 +379,71 @@ html { scroll-behavior: smooth; }
           </ul>
         </section>
       </div>
+
+      <!-- ===================== 약관 정보 ===================== -->
+      <div class="panel" id="panel-info" role="tabpanel" aria-labelledby="tab-info" hidden>
+        <p class="lead">약관을 올리면 <b>급부마다 언제, 얼마를 지급하는지</b>와 면책기간, 적립금 지급 여부를 한눈에 정리해 드립니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
+            <p><b>하나생명 홈페이지 → 상품공시실</b>에서 상품 약관(PDF)을 내려받습니다. Word 약관(.docx)도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>약관 선택 후 요약 보기</h3>
+            <p>약관 파일을 고르고 <b>[요약 보기]</b>를 누릅니다. 여러 상품을 한 번에 올려도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>급부별 정보 확인</h3>
+            <p>특약별로 지급사유 · 지급금액 · 면책기간 · 적립금 지급 여부가 정리됩니다. <b>노란 표시</b>는 원문을 확인하세요.</p></div>
+        </div>
+
+        <section class="sec" aria-label="약관 선택">
+          <h2 class="sec-title">약관 선택</h2>
+          <div class="runbox">
+            <div class="band"><strong>약관 파일 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
+            <div class="form">
+              <label class="k" for="i-pick-file">약관 파일</label>
+              <div class="field empty" id="i-src-field"><span id="i-src-text">PDF·Word 약관을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns">
+                <button type="button" id="i-pick-file">파일 선택</button>
+                <button type="button" id="i-pick-dir">폴더 선택</button>
+              </div>
+            </div>
+            <input class="hidden-input" type="file" id="i-in-dir" webkitdirectory multiple>
+            <input class="hidden-input" type="file" id="i-in-file" multiple accept=".docx,.docm,.doc,.pdf">
+            <div class="bar">
+              <button type="button" class="primary" id="i-run" disabled>요약 보기</button>
+              <button type="button" class="link" id="i-sample" disabled>예제 약관으로 해 보기</button>
+            </div>
+            <p class="notice" id="i-msg" hidden></p>
+            <div class="console" id="i-log" aria-live="polite" tabindex="0" style="height:120px"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="i-result" aria-label="약관 요약">
+          <h2 class="sec-title">급부별 요약 <span class="tag" id="i-tag">예제 결과</span></h2>
+          <div>
+            <div class="info-bar">
+              <div class="stats" id="i-stats"></div>
+              <input type="search" id="i-filter" placeholder="급부명 · 특약명 찾기" aria-label="급부명 또는 특약명으로 찾기">
+            </div>
+            <div id="i-view"></div>
+          </div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li>약관의 <b>보험금 지급기준표</b>(급부명 · 지급사유 · 지급금액 표)를 읽어 정리합니다. [약관에서 추출] 탭과 같은 규칙이라 결과도 같습니다.</li>
+            <li><b>지급금액</b>은 약관 원문 그대로 보여 주고, 아래에 통계테이블에 들어가는 값(산출기준 · 지급율 · 감액)을 함께 적었습니다.</li>
+            <li><b>면책기간</b>은 지급사유의 'OO보장개시일'을 약관 본문에서 찾아 일수로 바꿉니다. 문구가 없으면 0일(면책 없음)입니다.</li>
+            <li><b>적립금 지급</b>은 사망 · 최초 1회 · 특정 시점 지급이면 '지급', 매년 · 1회당처럼 반복 지급이면 '미지급'으로 봅니다.</li>
+            <li>규칙으로 판단이 애매한 항목은 노란색으로 표시됩니다. 꼭 약관 원문을 확인하세요.</li>
+          </ul>
+        </section>
+      </div>
     </main>
   </div>
 </div>
 
 <script type="application/json" id="sample-extract">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 2개, 급부 8개", "급부 8개 → 초안 9행 (확인필요 3행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "납입주기", "산출기준", "지급율", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 0, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", null, "01", 0.2, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", null, "01", 0.02, 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", null, "01", 0.01, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, null, "01", 1, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, null, "01", 0.1, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, null, "01", 0.03, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, null, "01", 1, null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"]], "colors": ["#FFF2CC", "#FFF2CC", null, null, null, null, null, null, "#FFF2CC"], "total": 9}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"]], "colors": [null, null], "total": 2}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "납입주기", "산출기준", "기본지급율", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", null, null, null, null, "01", 0.5, null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", null, null, null, null, "01", 0.2, null, null, null, null, null, 0, 1, null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", null, null, null, null, "01", 0.02, null, null, null, null, null, 90, 0, null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", null, null, null, null, "01", 0.01, null, null, null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, null, null, null, null, "01", 0.1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, null, null, null, null, "01", 0.03, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 8, "sample_policy.docx"]], "colors": [null], "total": 1}], "name": "통계테이블초안_예제.xlsx"}</script>
 <script type="application/json" id="sample-revise">{"log": ["기존 테이블 9행 / 관계 5건 / 변경전후 6건", "  완료: 2건", "  확인필요: 1건", "  기존 행 없음: 1건", "  신규(기존 행 없음): 1건", "  관계테이블에 없음: 1건", "작성 행 수: 8", "결과 파일: 통계테이블_자동작성_예제.xlsx"], "sheets": [{"name": "통계테이블 작성대상", "columns": ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1", "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"], "rows": [["A200", "A2001", "B0101", "01", 0.5, 0, 1, 90, 0, 12], ["A200", "A2001", "B0101", "01", 1, 0, 1, 0, 13, 999], ["A200", "A2001", "B0102", "01", 0.2, 0, 1, 0, 0, 999], ["A200", "A2001", "B0201", "01", 0.02, 1, 0, 90, 0, 999], ["A200", "A2002", "B0301", "01", 1, 0, 1, 0, 0, 999], ["A200", "A2002", "B0302", "01", 0.1, 1, 0, 0, 0, 999], ["A200", "A2003", "B0401", "02", 1, 0, 1, 0, 0, 999], ["A200", "A2003", "B0402", "03", 1, 0, 1, 0, 0, 999]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "검토_상품코드", "columns": ["주보종코드", "개별상품코드(변경후)", "변경전코드", "처리", "상태", "작성행수", "급부코드", "급부명", "비고", "상품명"], "rows": [["A200", "A2001", "A1001", "코드변경", "완료", 4, "B0101, B0102, B0201", "암진단비, 유사암진단비, 암입원비", null, "(무)예제암진단특약Ⅱ"], ["A200", "A2002", "A1002", "코드변경", "완료", 2, "B0301, B0302", "상해사망, 상해수술비", null, "(무)예제상해보장특약Ⅱ"], ["A200", "A2003", "A1003, A1005", "코드변경", "확인필요", 2, "B0401, B0402", "납입면제, 보험료환급", "변경전 코드가 2개 (A1003, A1005) → 행을 합침", "(무)예제납입면제특약Ⅱ"], ["A200", "A2006", "A1007", "코드변경", "기존 행 없음", 0, null, null, "기존 테이블에 A1007 행 없음", "(무)예제수술특약Ⅱ"], ["A200", "A2008", null, "신규", "신규(기존 행 없음)", 0, null, null, null, "(무)예제간병특약(신규)"], [null, "A2009", "A1009", "-", "관계테이블에 없음", 0, null, null, "변경후 코드가 주보종-개별상품 관계 테이블에 없어 주보종코드를 알 수 없음", null]], "colors": [null, null, "#FFF2CC", "#F8CBAD", "#DDEBF7", "#F8CBAD"], "total": 6}, {"name": "검토_요약", "columns": ["상태", "건수", "설명"], "rows": [["완료", 2, "기존 행을 그대로 이어받음"], ["확인필요", 1, "이어받았지만 비고 확인 필요 (변경전 코드 여러 개 등)"], ["기존 행 없음", 1, "변경전 코드는 있는데 기존 테이블에 행이 없음 → 약관 보고 직접 작성"], ["신규(기존 행 없음)", 1, "변경전 코드도, 기존 행도 없음 → 신규 상품, 약관 보고 직접 작성"], ["관계테이블에 없음", 1, "변경후 코드의 주보종코드를 알 수 없음 → 관계 테이블 확인"], ["작성된 행 수", 8, "'통계테이블 작성대상' 시트"]], "colors": [null, null, null, null, null, null], "total": 6}], "name": "통계테이블_자동작성_예제.xlsx"}</script>
+<script type="application/json" id="sample-info">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 2개, 급부 8개", "급부 8개 요약"], "data": {"benefits": [{"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암진단비", "조항": "제3조", "납입주기": "", "산출기준": "01", "기본지급율": 0.5, "기준금액(원)": null, "감액기간(년)": 1, "감액비율": 0.5, "감액방식": "절대값", "면책기간": 90, "적립금지급여부": 1, "확인필요": "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "근거_감액": "1년미만 진단확정시 보험가입금액의 50%", "근거_면책": "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "근거_적립금": "최초 1회", "원문_지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "원문_지급금액": "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "유사암진단비", "조항": "제4조", "납입주기": "", "산출기준": "01", "기본지급율": 0.2, "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일(질병명 없음)", "근거_적립금": "최초 1회", "원문_지급사유": "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "원문_지급금액": "보험가입금액의 20%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암입원비", "조항": "제5조", "납입주기": "", "산출기준": "01", "기본지급율": 0.02, "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 90, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "근거_적립금": "반복 지급", "원문_지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "원문_지급금액": "1일당 보험가입금액의 2%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암직접치료통원비", "조항": "제6조", "납입주기": "", "산출기준": "01", "기본지급율": 0.01, "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "원문_지급금액": "보험가입금액의 1%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해사망보험금", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 1, "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "사망 급부", "원문_지급사유": "보험기간 중 상해의 직접결과로써 사망하였을 때", "원문_지급금액": "1,000만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해수술비", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 0.1, "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "원문_지급금액": "100만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "골절진단비", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 0.03, "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "원문_지급금액": "30만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해후유장해보험금", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 1, "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": null, "확인필요": "적립금 지급여부 확인(지급횟수 문구 없음)", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "지급횟수 문구 없음", "원문_지급사유": "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "원문_지급금액": "1,000만원 × 장해지급률"}], "failed": []}}</script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -362,7 +451,8 @@ html { scroll-behavior: smooth; }
   const XLSX_EXT = /\.(xlsx|xlsm)$/i;
   const LONG_COLS = new Set(["확인필요", "급부목록", "근거_기준금액", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유",
     "원문_지급금액", "경로", "결과", "별표명", "비고", "설명", "급부명", "급부코드", "상품명"]);
-  const NAMES = { extract: "약관에서 추출", revise: "개정 후 자동화" };
+  const NAMES = { extract: "약관에서 추출", revise: "개정 후 자동화", info: "약관 정보" };
+  const ORDER = ["extract", "revise", "info"];
 
   // 기능별 설정
   const TOOLS = {
@@ -406,6 +496,13 @@ html { scroll-behavior: smooth; }
         ];
       },
     },
+    info: {
+      p: "i",
+      view: "info",
+      sampleFile: "sample/sample_policy.docx",
+      sampleNote: "↑ 예제 약관을 요약한 기록입니다. 약관 파일을 고른 뒤 [요약 보기]를 누르세요.",
+      doneMsg: "급부별 요약을 만들었습니다. 노란 표시는 약관 원문을 확인하세요.",
+    },
   };
   for (const [k, t] of Object.entries(TOOLS)) Object.assign(t, { key: k, files: [], code: null, result: null, sheet: 0, onlyMarked: false });
 
@@ -442,6 +539,7 @@ html { scroll-behavior: smooth; }
     }
     $("x-stop").disabled = busy !== "extract";
     for (const id of ["x-pick-dir", "x-pick-code", "x-clear-code"]) $(id).disabled = busy === "extract";
+    $("i-pick-dir").disabled = busy === "info";
   }
 
   // ---------- 기능 탭 ----------
@@ -462,7 +560,8 @@ html { scroll-behavior: smooth; }
     b.addEventListener("click", () => { selectTool(b.dataset.tool); history.replaceState(null, "", "#" + b.dataset.tool); });
     b.addEventListener("keydown", (e) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      const next = current === "extract" ? "revise" : "extract";
+      const i = ORDER.indexOf(current) + (e.key === "ArrowRight" ? 1 : -1);
+      const next = ORDER[(i + ORDER.length) % ORDER.length];
       selectTool(next, true);
       history.replaceState(null, "", "#" + next);
     });
@@ -507,7 +606,7 @@ html { scroll-behavior: smooth; }
     setEngine("busy", "실행 중");
     refreshButtons();
     $(t.p + "-log").textContent = "";
-    logLine(t, t.key === "extract" ? "추출 시작..." : "작성 시작...");
+    logLine(t, { extract: "추출 시작...", revise: "작성 시작...", info: "요약 시작..." }[t.key]);
     try {
       const payload = await Promise.all(files.map(async (f) => ({ path: f.path, data: await f.file.arrayBuffer() })));
       const codePayload = code ? { name: code.name, data: await code.arrayBuffer() } : null;
@@ -521,7 +620,8 @@ html { scroll-behavior: smooth; }
     busy = null;
     setEngine("ready", "준비됨");
     refreshButtons();
-    setResult(t, { name: d.name, sheets: JSON.parse(d.sheets), xlsx: new Blob([d.xlsx]), sample: false });
+    if (t.view === "info") setInfo(t, JSON.parse(d.info), false);
+    else setResult(t, { name: d.name, sheets: JSON.parse(d.sheets), xlsx: new Blob([d.xlsx]), sample: false });
     showMsg(t, t.doneMsg);
     $(t.p + "-result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
@@ -544,15 +644,15 @@ html { scroll-behavior: smooth; }
 
   // ---------- 파일 고르기 ----------
   function setSource(t, list, label) {
-    const ok = t.key === "extract" ? WORD_EXT : XLSX_EXT;
+    const ok = t.key === "revise" ? XLSX_EXT : WORD_EXT;
     let usable = list.filter((f) => ok.test(f.path) && !f.path.split("/").pop().startsWith("~$"));
     if (t.key === "revise") usable = usable.slice(0, 1);
     if (!list.length) return;
     t.files = usable;
     $(t.p + "-src-field").classList.remove("empty");
     if (!usable.length) {
-      $(t.p + "-src-text").textContent = label + (t.key === "extract" ? " (PDF·Word 파일 없음)" : " (엑셀 파일 아님)");
-      showMsg(t, t.key === "extract" ? "고른 곳에서 PDF·Word 약관을 찾지 못했습니다." : "양식은 엑셀(.xlsx) 파일이어야 합니다.", "warn");
+      $(t.p + "-src-text").textContent = label + (t.key !== "revise" ? " (PDF·Word 파일 없음)" : " (엑셀 파일 아님)");
+      showMsg(t, t.key !== "revise" ? "고른 곳에서 PDF·Word 약관을 찾지 못했습니다." : "양식은 엑셀(.xlsx) 파일이어야 합니다.", "warn");
     } else {
       $(t.p + "-src-text").textContent = usable.length === 1 ? usable[0].path : `${label} · PDF·Word ${usable.length}개`;
       showMsg(t, "");
@@ -564,15 +664,19 @@ html { scroll-behavior: smooth; }
   pick("x-pick-dir", "x-in-dir");
   pick("x-pick-code", "x-in-code");
   pick("r-pick-file", "r-in-file");
-  $("x-in-dir").addEventListener("change", (e) => {
-    const files = [...e.target.files];
-    if (files.length) {
-      const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
-      setSource(TOOLS.extract, files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
-    }
-    e.target.value = "";
-  });
-  for (const [input, t] of [["x-in-file", TOOLS.extract], ["r-in-file", TOOLS.revise]]) {
+  pick("i-pick-file", "i-in-file");
+  pick("i-pick-dir", "i-in-dir");
+  for (const [input, t] of [["x-in-dir", TOOLS.extract], ["i-in-dir", TOOLS.info]]) {
+    $(input).addEventListener("change", (e) => {
+      const files = [...e.target.files];
+      if (files.length) {
+        const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+        setSource(t, files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
+      }
+      e.target.value = "";
+    });
+  }
+  for (const [input, t] of [["x-in-file", TOOLS.extract], ["r-in-file", TOOLS.revise], ["i-in-file", TOOLS.info]]) {
     $(input).addEventListener("change", (e) => {
       const files = [...e.target.files];
       if (files.length) setSource(t, files.map((f) => ({ path: f.name, file: f })), files.length === 1 ? files[0].name : "선택한 파일");
@@ -636,7 +740,7 @@ html { scroll-behavior: smooth; }
   }
   for (const t of Object.values(TOOLS)) {
     $(t.p + "-run").addEventListener("click", () => {
-      if (!t.files.length) { showMsg(t, t.key === "extract" ? "약관 파일을 선택해 주세요." : "양식 엑셀을 선택해 주세요.", "warn"); return; }
+      if (!t.files.length) { showMsg(t, t.key !== "revise" ? "약관 파일을 선택해 주세요." : "양식 엑셀을 선택해 주세요.", "warn"); return; }
       run(t, t.files, t.key === "extract" ? t.code : null);
     });
     $(t.p + "-sample").addEventListener("click", async () => {
@@ -778,6 +882,129 @@ html { scroll-behavior: smooth; }
     grid.appendChild(table);
   }
 
+  // ---------- 약관 정보 (급부별 요약) ----------
+  const BASIS = { "01": "보험가입금액", "02": "보험료(월납·연납)", "03": "납입보험료", "확인": "확인 필요" };
+  const pct = (x) => (x === null || x === undefined ? "?" : Math.round(x * 10000) / 100 + "%");
+  const won = (v) => (v % 10000 === 0 ? (v / 10000).toLocaleString() + "만원" : v.toLocaleString() + "원");
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  };
+  function evidence(s) {
+    if (!s) return null;
+    const t = String(s).replace(/^(특약본문|약관전체|\(주\)):\s*/, "");
+    const e = el("span", "sub", "근거: " + (t.length > 40 ? t.slice(0, 40) + "…" : t));
+    e.title = String(s);
+    return e;
+  }
+  function amountCell(b) {
+    const td = el("td", "amt");
+    td.appendChild(el("span", "main", b["원문_지급금액"] || ""));
+    const parts = [];
+    parts.push((BASIS[b["산출기준"]] || b["산출기준"] || "?") + " × " + pct(b["기본지급율"]));
+    if (b["기준금액(원)"]) parts.push("기준 가입금액 " + won(b["기준금액(원)"]));
+    if (b["감액기간(년)"]) {
+      const reduced = b["감액방식"] === "절대값" ? b["감액비율"] : (b["기본지급율"] ?? 0) * b["감액비율"];
+      parts.push(`가입 ${b["감액기간(년)"]}년 미만 ${pct(reduced)}`);
+    }
+    if (b["납입주기"]) parts.push(b["납입주기"]);
+    td.appendChild(el("span", "sub", "통계테이블 값: " + parts.join(" · ")));
+    return td;
+  }
+  function setInfo(t, data, sample) {
+    t.info = data;
+    $("i-tag").hidden = !sample;
+    const bens = data.benefits || [];
+    const groups = new Map();
+    for (const b of bens) {
+      const k = b["파일명"] + "\u0000" + b["특약명"];
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(b);
+    }
+    const nChk = bens.filter((b) => b["확인필요"]).length;
+    const stats = $("i-stats");
+    stats.textContent = "";
+    const files = new Set(bens.map((b) => b["파일명"]));
+    for (const [k, v, unit, warn] of [["파일", files.size, "개"], ["특약", groups.size, "개"], ["급부", bens.length, "개"], ["확인필요", nChk, "개", true]]) {
+      const s = el("span", warn && v > 0 ? "chk" : "");
+      s.append(k + " ", el("b", "", v), unit);
+      stats.appendChild(s);
+    }
+    const view = $("i-view");
+    view.textContent = "";
+    for (const f of data.failed || []) {
+      const p = el("p", "notice err", `${f["파일명"]}: ${f["오류"]}`);
+      p.style.margin = "14px 0 0";
+      view.appendChild(p);
+    }
+    if (!bens.length) {
+      view.appendChild(el("div", "empty-sheet", "약관에서 보험금 지급기준표를 찾지 못했습니다."));
+      return;
+    }
+    for (const rows of groups.values()) {
+      const g = el("div", "prod");
+      g.appendChild(el("h3", "", rows[0]["특약명"]));
+      g.appendChild(el("div", "meta", [rows[0]["별표명"], rows[0]["파일명"], `급부 ${rows.length}개`].filter(Boolean).join(" · ")));
+      const wrap = el("div", "info-wrap");
+      const table = el("table", "info");
+      const hr = table.createTHead().insertRow();
+      for (const h of ["급부", "지급사유 (언제)", "지급금액 (얼마)", "면책기간", "적립금 지급"]) hr.appendChild(el("th", "", h));
+      const tb = table.createTBody();
+      for (const b of rows) {
+        const tr = tb.insertRow();
+        tr.dataset.q = (b["급부명"] + " " + b["특약명"]).toLowerCase();
+        // 급부
+        const c1 = el("td", "ben");
+        c1.appendChild(el("span", "main", b["급부명"]));
+        if (b["조항"]) c1.appendChild(el("span", "sub", b["조항"]));
+        if (b["확인필요"]) {
+          c1.appendChild(el("span", "flag", "확인필요"));
+          c1.appendChild(el("span", "memo", b["확인필요"]));
+        }
+        tr.appendChild(c1);
+        // 지급사유
+        tr.appendChild(el("td", "why", b["원문_지급사유"] || ""));
+        // 지급금액
+        tr.appendChild(amountCell(b));
+        // 면책기간
+        const c4 = el("td", "wait");
+        const w = b["면책기간"];
+        if (w === null || w === undefined) c4.appendChild(el("span", "unk", "확인필요"));
+        else c4.appendChild(el("span", "big", w > 0 ? `${w}일` : "없음"));
+        const ev = w > 0 ? evidence(b["근거_면책"]) : null;
+        if (ev) c4.appendChild(ev);
+        tr.appendChild(c4);
+        // 적립금
+        const c5 = el("td", "res");
+        const r = b["적립금지급여부"];
+        if (r === 1) c5.appendChild(el("span", "big yes", "지급"));
+        else if (r === 0) c5.appendChild(el("span", "big no", "미지급"));
+        else c5.appendChild(el("span", "unk", "확인필요"));
+        if (b["근거_적립금"]) c5.appendChild(el("span", "sub", b["근거_적립금"]));
+        tr.appendChild(c5);
+      }
+      wrap.appendChild(table);
+      g.appendChild(wrap);
+      view.appendChild(g);
+    }
+    applyFilter();
+  }
+  function applyFilter() {
+    const q = $("i-filter").value.trim().toLowerCase();
+    for (const g of $("i-view").querySelectorAll(".prod")) {
+      let any = false;
+      for (const tr of g.querySelectorAll("tbody tr")) {
+        const hit = !q || tr.dataset.q.includes(q);
+        tr.classList.toggle("hide", !hit);
+        any = any || hit;
+      }
+      g.hidden = !any;
+    }
+  }
+  $("i-filter").addEventListener("input", applyFilter);
+
   // ---------- 내려받기 ----------
   async function saveFile(t, blob, filename) {
     if (window.claude && window.claude.use) {
@@ -804,12 +1031,13 @@ html { scroll-behavior: smooth; }
 
   // ---------- 시작: 예제 결과를 먼저 보여 주고 실행 엔진을 미리 준비 ----------
   for (const t of Object.values(TOOLS)) {
-    buildView(t);
+    if (t.view !== "info") buildView(t);
     try {
       const sample = JSON.parse($("sample-" + t.key).textContent);
       for (const l of sample.log) logLine(t, l, "dim");
       logLine(t, t.sampleNote, "dim");
-      setResult(t, { name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
+      if (t.view === "info") setInfo(t, sample.data, true);
+      else setResult(t, { name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
     } catch (e) {}
   }
   selectTool(location.hash.slice(1));

@@ -4,6 +4,7 @@
 - 브라우저 안의 Python(Pyodide)에서 실행됩니다. 파일은 서버로 올라가지 않습니다.
 - 약관에서 추출:        benefit_extractor2.run()   그대로 사용
 - 개정 후 자동화:       stat_builder.build()       그대로 사용
+- 약관 정보:            benefit_extractor2.extract_file() 결과를 급부별 요약으로
 - 결과 엑셀을 화면 미리보기용 JSON 으로도 돌려줍니다 (엑셀의 행 색 표시 포함).
 """
 import json
@@ -70,6 +71,35 @@ def run_job(src, out_dir, code_xlsx=None, log=print):
     """[약관에서 추출] 실행: 추출 → 엑셀 저장. (엑셀 경로, 미리보기 JSON)"""
     path = be.run(src, out_dir, code_xlsx or None, log=log)
     return path, sheets_json(path)
+
+
+INFO_FIELDS = ["파일명", "특약명", "별표명", "급부명", "조항", "납입주기", "산출기준", "기본지급율", "기준금액(원)",
+               "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요",
+               "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"]
+
+
+def info_job(src, log=print):
+    """[약관 정보] 실행: 약관 → 급부별 요약 JSON (엑셀은 만들지 않음).
+    benefit_extractor2 의 extract_file() 결과(급부원문 시트와 같은 값)를 그대로 씀"""
+    files = be.list_word_files(src)
+    if not files:
+        raise RuntimeError("Word/PDF 파일을 찾지 못했습니다.")
+    log(f"대상 파일 {len(files)}개")
+    out, failed = [], []
+    reader = be.WordReader()
+    try:
+        for i, f in enumerate(files, 1):
+            log(f"[{i}/{len(files)}]")
+            try:
+                for b in be.extract_file(f, None, log, reader):
+                    out.append({k: _cell(b.get(k)) for k in INFO_FIELDS})
+            except Exception as e:
+                log(f"  실패: {f.split('/')[-1]} -> {e}")
+                failed.append({"파일명": f.split("/")[-1], "오류": str(e)})
+    finally:
+        reader.quit()
+    log(f"급부 {len(out)}개 요약")
+    return json.dumps({"benefits": out, "failed": failed}, ensure_ascii=False)
 
 
 def build_job(in_xlsx, out_dir, log=print):

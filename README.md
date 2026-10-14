@@ -13,6 +13,7 @@ Spyder에서 F5로 띄우던 창과 같은 화면을 웹페이지로 만든 것�
 
 - **약관에서 추출**: 상품 약관(PDF·Word) → 통계테이블 초안 (`benefit_extractor2.py`)
 - **개정 후 자동화**: 기존 통계테이블 + 상품코드 변경 → 개정 후 통계테이블 (`stat_builder.py`).
+- **약관 정보**: 상품 약관 → 급부별 지급사유 · 지급금액 · 면책기간 · 적립금 지급 여부 요약 (`benefit_extractor2.py` 의 추출 결과를 화면용으로 정리)
   예제 양식은 `web/sample/sample_revision.xlsx` 입니다.
 
 로컬에서 보기 (저장소 폴더에서):

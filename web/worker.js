@@ -1,6 +1,6 @@
 // 브라우저 안에서 Python(Pyodide)을 띄워 benefit_extractor2.py / stat_builder.py 를 그대로 실행하는 작업자.
 // 화면(index.html)과 메시지로 주고받습니다:
-//   화면 → {type:"run", tool:"extract"|"revise", files:[{path, data}], code:{name, data}|null}
+//   화면 → {type:"run", tool:"extract"|"revise"|"info", files:[{path, data}], code:{name, data}|null}
 //   작업자 → {type:"status"|"log"|"done"|"error", ...}
 
 const PYODIDE_VERSION = "0.26.4";
@@ -137,6 +137,13 @@ self.onmessage = async (ev) => {
     const logFn = { log: (m) => log(tidy(m)) };
     const runner = py.globals.get("web_runner");
     let res;
+    if (msg.tool === "info") {
+      // 약관 정보: 급부별 요약만 (엑셀 없음)
+      const json = runner.info_job.callKwargs(inDir, logFn);
+      runner.destroy();
+      postMessage({ type: "done", tool: msg.tool, info: tidy(json) });
+      return;
+    }
     if (msg.tool === "revise") {
       // 개정 후 자동화: 양식 엑셀 1개 → stat_builder.build()
       res = runner.build_job.callKwargs(inDir + "/" + msg.files[0].path, outDir, logFn);
