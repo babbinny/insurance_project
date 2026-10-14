@@ -5,7 +5,8 @@
 입력: 아래 5개 시트가 들어 있는 엑셀 파일 (양식 파일 그대로)
     1번 시트  통계테이블 작성 대상  ← 여기에 결과가 채워짐
     2번 시트  통계테이블 기존      (개정 전 테이블)
-    3번 시트  주보종코드-개별상품코드 관계 테이블 (SP_SPCD, SP_SPCD1)
+    3번 시트  주보종코드-개별상품코드 관계 테이블 (주보종명, SP_SPCD, 개별상품명, SP_SPCD1)
+              ※ 상품명은 각 코드 칼럼 바로 왼쪽 칼럼에 둡니다 (칼럼명은 무엇이든 됨)
     4번 시트  변경전,후 상품코드 (변경전, 변경후)
     5번 시트  급부코드 체계 (급부코드, 급부명)
 
@@ -47,6 +48,7 @@ SHEET_CODE = 4
 TABLE_COLS = ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1",
               "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"]
 REL_MAIN, REL_SP = "SP_SPCD", "SP_SPCD1"      # 관계 테이블 칼럼명
+REL_MAIN_NAME, REL_SP_NAME = "주보종명", "개별상품명"   # 각 코드 바로 왼쪽 칼럼(상품명)을 검토 시트에 표시할 이름
 MAP_BEFORE, MAP_AFTER = "변경전", "변경후"      # 변경전/후 칼럼명
 CODE_COL, CODE_NAME_COL = "급부코드", "급부명"
 
@@ -87,6 +89,15 @@ def read_rows(ws, hdr_row, cols):
     return out
 
 
+def name_col_left_of(code_col, code_cols):
+    """코드 칼럼 바로 왼쪽 칼럼 = 그 코드의 상품명 칼럼 (칼럼명이 '상품명'으로 같아도 위치로 구분).
+    왼쪽에 칼럼이 없거나 다른 코드 칼럼이면 None"""
+    c = code_col - 1
+    if c < 1 or c in code_cols:
+        return None
+    return c
+
+
 def extra_cols(all_cols, used):
     """칼럼명 행에서 사용하지 않은 나머지 칼럼 (상품명/특약명 등) → 검토 시트에 함께 표시"""
     return {n: c for n, c in all_cols.items() if n not in used}
@@ -109,7 +120,14 @@ def build(in_path, out_dir, log=print):
     o_hdr, o_cols, _ = find_header(ws_o, TABLE_COLS, ws_o.title)
     r_hdr, r_cols, r_all = find_header(ws_r, [REL_MAIN, REL_SP], ws_r.title)
     m_hdr, m_cols, m_all = find_header(ws_m, [MAP_BEFORE, MAP_AFTER], ws_m.title)
-    r_extra = extra_cols(r_all, [REL_MAIN, REL_SP])
+    r_codes = [r_cols[REL_MAIN], r_cols[REL_SP]]
+    r_name_main = name_col_left_of(r_cols[REL_MAIN], r_codes)
+    r_name_sp = name_col_left_of(r_cols[REL_SP], r_codes)
+    r_used = set(r_codes) | {c for c in (r_name_main, r_name_sp) if c}
+    r_extra = {n: c for n, c in r_all.items() if c not in r_used}     # 그 밖의 칼럼은 검토 시트 끝에 함께 표시
+    missing = [c for c, n in ((REL_MAIN, r_name_main), (REL_SP, r_name_sp)) if not n]
+    if missing:
+        log(f"  (참고) [{ws_r.title}] 시트의 {', '.join(missing)} 왼쪽에 상품명 칼럼이 없어 상품명 없이 진행합니다.")
 
     old_rows = read_rows(ws_o, o_hdr, o_cols)
     rel = []
@@ -117,6 +135,8 @@ def build(in_path, out_dir, log=print):
         main, sp = norm(ws_r.cell(r, r_cols[REL_MAIN]).value), norm(ws_r.cell(r, r_cols[REL_SP]).value)
         if main and sp:
             rel.append({"main": main, "sp": sp,
+                        "main_name": norm(ws_r.cell(r, r_name_main).value) if r_name_main else "",
+                        "sp_name": norm(ws_r.cell(r, r_name_sp).value) if r_name_sp else "",
                         "extra": {n: ws_r.cell(r, c).value for n, c in r_extra.items()}})
     maps = read_rows(ws_m, m_hdr, m_cols)
     log(f"기존 테이블 {len(old_rows)}행 / 관계 {len(rel)}건 / 변경전후 {len(maps)}건")
@@ -197,7 +217,8 @@ def build(in_path, out_dir, log=print):
             c = norm(r["SCRP_RISK_PRM_CODE"])
             bens[c] = code_names.get(c, "")
         review.append(OrderedDict([
-            ("주보종코드", main), ("개별상품코드(변경후)", sp),
+            ("주보종코드", main), (REL_MAIN_NAME, x["main_name"]),
+            ("개별상품코드(변경후)", sp), (REL_SP_NAME, x["sp_name"]),
             ("변경전코드", ", ".join(befores) if befores else ("(동일)" if how == "코드유지" else "")),
             ("처리", how), ("상태", status), ("작성행수", len(rows)),
             ("급부코드", ", ".join(bens)),
@@ -210,7 +231,8 @@ def build(in_path, out_dir, log=print):
     for a, bs in after_to_before.items():
         if a not in rel_sps:
             review.append(OrderedDict([
-                ("주보종코드", ""), ("개별상품코드(변경후)", a), ("변경전코드", ", ".join(bs)),
+                ("주보종코드", ""), (REL_MAIN_NAME, ""), ("개별상품코드(변경후)", a), (REL_SP_NAME, ""),
+                ("변경전코드", ", ".join(bs)),
                 ("처리", "-"), ("상태", "관계테이블에 없음"), ("작성행수", 0),
                 ("급부코드", ""), ("급부명", ""),
                 ("비고", "변경후 코드가 주보종-개별상품 관계 테이블에 없어 주보종코드를 알 수 없음"),
