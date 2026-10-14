@@ -3,7 +3,7 @@
 약관 지급기준표 추출 프로그램 (통계테이블 초안 만들기)
 ----------------------------------------------------------------
 - Word 약관(.docx)에서 '급부명 / 지급사유 / 지급금액' 표를 찾아
-  급부명, 산출기준, 지급율, 적립금 지급여부, 면책기간, 경과년1/경과년2 를 뽑습니다.
+  급부명, 산출기준, 지급율, 지급주기, 적립금 지급여부, 면책기간, 경과년1/경과년2 를 뽑습니다.
 - 감액(예: 1년미만 50%)이 있으면 경과 구간을 자동으로 나눕니다.
     예) 0~12 : 0.5 / 13~999 : 1
 - 한 파일에 여러 특약이 들어 있는 책자형 약관(PDF)도 특약 제목을 찾아 특약별로 구분합니다.
@@ -92,8 +92,19 @@ DEATH_WORDS = ["사망"]                                                        
 ONE_TIME_PATTERNS = [r"경과\s*시점", r"종료\s*시점", r"계약\s*해당일에\s*살아\s*있", r"만기\s*(?:시|일)",
                      r"일시\s*(?:금|자금|지급)"]
 
-# 지급금액에 납입주기가 적혀 있으면 '납입주기' 칸에 표시 (월납/연납 행 구분용)
+# 지급금액에 납입주기가 적혀 있으면 [급부원문] 시트 '납입주기' 칸에 표시 (월납/연납 행 구분 참고용)
 PAY_CYCLE_WORDS = ["월납", "3월납", "6월납", "연납", "일시납"]
+
+# 지급주기 (통계테이블 PAY_TERM1)
+#   급부 발생 때마다 한 번 지급 → "100",  정해진 횟수만큼 매월 지급(예: n회 월지급) → "211",  그 밖 → "100"
+PAY_TERM_DEFAULT = "100"
+PAY_TERM_MONTHLY_N = "211"
+PAY_TERM_MONTHLY_N_PATTERNS = [            # 지급사유+지급금액(공백 제거)에서 찾음. '매월' 같은 월 지급 표현 + 횟수/기간이 함께 있어야 함
+    r"매월.{0,30}?\d+회",                   # 매월 계약해당일에 … (120회 한도) / 매월 10만원씩 36회
+    r"\d+회.{0,10}?(?:월지급|매월|월분할|매달)",   # 36회 월지급 / 60회에 걸쳐 매월
+    r"\d+개월(?:간|동안).{0,20}?(?:매월|매달|월지급)",   # 36개월간 매월
+    r"(?:매월|매달).{0,30}?\d+개월(?:간|동안)",         # 매월 … 36개월간
+]
 
 # 경과 구간 (월 단위)
 END_MONTH = 999
@@ -773,6 +784,16 @@ def get_pay_cycle(amount_text):
     return found[0] if found else ""
 
 
+def get_pay_term(text):
+    """지급사유+지급금액 → (지급주기 코드, 근거). n회 월지급이면 '211', 그 밖은 '100'"""
+    t = nospace(text)
+    for p in PAY_TERM_MONTHLY_N_PATTERNS:
+        m = re.search(p, t)
+        if m:
+            return PAY_TERM_MONTHLY_N, m.group(0)
+    return PAY_TERM_DEFAULT, ""
+
+
 def norm_benefit(s):
     s = nospace(re.sub(r"[\(\[].*?[\)\]]", "", s))
     for suf in NAME_SUFFIXES:
@@ -964,6 +985,7 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
     if wait is None and "문구 없음" in wait_memo:
         wait = 0
         wait_src = "보장개시일 문구 없음 → 0"
+    pay_term, pay_term_src = get_pay_term(both)
     once, once_src = get_once_flag(name, both)
     if once is None:
         memo.append(f"적립금 지급여부 확인({once_src})")
@@ -978,19 +1000,19 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
         "급부명": name, "조항": article,
         "급부코드": code, "급부코드명": code_name, "매칭점수": score,
         "납입주기": get_pay_cycle(amount),
-        "산출기준": basis, "기본지급율": rate, "기준금액(원)": base, "근거_기준금액": base_src,
+        "산출기준": basis, "기본지급율": rate, "지급주기": pay_term, "기준금액(원)": base, "근거_기준금액": base_src,
         "감액기간(년)": red_years, "감액비율": red_ratio, "감액방식": red_mode,
         "면책기간": wait, "적립금지급여부": once,
         "확인필요": " / ".join(memo),
-        "근거_산출기준": basis_word, "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
+        "근거_산출기준": basis_word, "근거_지급주기": pay_term_src, "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
         "원문_지급사유": reason, "원문_지급금액": amount,
     }
 
 
 def expand_rows(b):
     """급부 1개 → 경과 구간별 행"""
-    base = {k: b[k] for k in ["파일명", "특약명", "급부명", "조항", "납입주기", "급부코드", "급부코드명",
-                              "산출기준", "적립금지급여부", "면책기간"]}
+    base = {k: b[k] for k in ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명",
+                              "산출기준", "지급주기", "적립금지급여부", "면책기간"]}
     rate = b["기본지급율"]
     if rate is not None and b["감액기간(년)"]:
         cut = 12 * b["감액기간(년)"]
@@ -1057,7 +1079,7 @@ def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
     finally:
         reader.quit()       # 뒤에서 연 Word 닫기
 
-    draft_cols = ["파일명", "특약명", "급부명", "조항", "납입주기", "급부코드", "급부코드명", "산출기준", "지급율",
+    draft_cols = ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명", "산출기준", "지급율", "지급주기",
                   "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"]
     draft = pd.DataFrame([r for b in benefits for r in expand_rows(b)], columns=draft_cols)
     if codes is None:
