@@ -497,7 +497,10 @@ def _pdf_page_tables(page, carry):
     return found, nxt
 
 
-def read_pdf(path):
+PDF_PROGRESS_PAGES = 100   # PDF 를 읽을 때 이 쪽수마다 진행 상황을 로그에 표시
+
+
+def read_pdf(path, log=None):
     try:
         import pdfplumber
     except ImportError:
@@ -505,7 +508,8 @@ def read_pdf(path):
     blocks = []
     carry = None
     with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
+        n_pages = len(pdf.pages)
+        for pno, page in enumerate(pdf.pages, 1):
             tables, carry = _pdf_page_tables(page, carry)
             boxes = [(t[4][0] - 2, t[0], t[4][-1] + 2, t[1]) for t in tables]
             items = [(t[0], "tbl", t[2]) for t in tables if t[2]]
@@ -528,16 +532,19 @@ def read_pdf(path):
                         y += 0.001
             items.sort(key=lambda x: x[0])
             blocks += [(k, d) for _, k, d in items]
+            page.close()        # 읽은 쪽의 글자·선 정보를 메모리에서 비움 (큰 PDF에서 메모리 부족 방지)
+            if log and n_pages > PDF_PROGRESS_PAGES and (pno % PDF_PROGRESS_PAGES == 0 or pno == n_pages):
+                log(f"  {os.path.basename(path)}: {pno}/{n_pages}쪽 읽음")
     text = " ".join(d for k, d in blocks if k == "p")
     if text.count("(cid:") > 20:
         raise RuntimeError("PDF 글자를 읽을 수 없음(글꼴 문제). Word 파일로 시도해 주세요.")
     return blocks
 
 
-def read_any(path, word_reader):
+def read_any(path, word_reader, log=None):
     """일반 .docx 는 바로 읽고, 안 되면(DRM/.doc) Word 프로그램으로 읽음. (blocks, 읽은방식)"""
     if path.lower().endswith(".pdf"):
-        return read_pdf(path), "PDF"
+        return read_pdf(path, log), "PDF"
     if path.lower().endswith((".docx", ".docm")):
         try:
             return read_docx(path), "직접"
@@ -783,7 +790,7 @@ def _only_page_noise(blocks, a, b):
 
 
 def extract_file(path, codes, log, word_reader):
-    blocks, how = read_any(path, word_reader)
+    blocks, how = read_any(path, word_reader, log)
     whole = "\n".join(b[1] for b in blocks if b[0] == "p")
 
     # 1) 지급기준표 모으기 (다음 쪽으로 이어진 표는 하나로 합침)
