@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>약관 맞춤 요약</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>약관 맞춤 요약</h1>
+    <p>수백 쪽짜리 보험 약관, 나에게 필요한 내용만 골라 읽어 드립니다.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="keyWarn" class="notice warn" hidden>
+    서버에 <code>ANTHROPIC_API_KEY</code>가 설정되지 않았습니다. README의 "2단계"를 따라 설정한 뒤 서버를 다시 실행하세요.
+  </div>
+
+  <!-- 1. 업로드 -->
+  <section class="card">
+    <h2><span class="step">1</span> 약관 PDF 올리기</h2>
+    <label id="drop" class="drop">
+      <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+      <strong>여기를 눌러 PDF 선택</strong> 또는 파일을 끌어다 놓기
+      <small>보험사 홈페이지 &gt; 상품공시실에서 받은 약관 PDF</small>
+    </label>
+    <div id="docInfo" class="doc-info" hidden></div>
+  </section>
+
+  <!-- 2. 방식 선택 -->
+  <section class="card">
+    <h2><span class="step">2</span> 요약 방식</h2>
+    <div class="modes">
+      <label class="mode"><input type="radio" name="mode" value="general" checked>
+        <span><b>상품 전체 요약</b><small>정보 입력 없이, 누구나 알아야 할 핵심</small></span></label>
+      <label class="mode"><input type="radio" name="mode" value="personal">
+        <span><b>내 상황 맞춤 요약</b><small>나이·병력·목적에 맞춰 나에게 해당하는 것만</small></span></label>
+    </div>
+  </section>
+
+  <!-- 3. 내 정보 -->
+  <section class="card" id="profileCard" hidden>
+    <h2><span class="step">3</span> 내 정보 <small class="muted">모르는 항목은 비워 두세요</small></h2>
+    <form id="profile" onsubmit="return false">
+      <fieldset>
+        <legend>기본 정보</legend>
+        <div class="row">
+          <label>나이(만)<input type="number" name="age" min="0" max="110" placeholder="예: 35"></label>
+          <label>성별
+            <select name="gender"><option value="">선택</option><option>남성</option><option>여성</option></select>
+          </label>
+          <label>월 보험료 예산<input name="budget" placeholder="예: 10만원"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>가입 목적 (여러 개 선택 가능)</legend>
+        <div class="chips" data-name="purposes">
+          <label><input type="checkbox" value="건강보험">건강보험(진단·입원·수술)</label>
+          <label><input type="checkbox" value="암보험">암보험</label>
+          <label><input type="checkbox" value="실손보험">실손의료비</label>
+          <label><input type="checkbox" value="사망보험">사망보험(종신·정기)</label>
+          <label><input type="checkbox" value="연금·저축">연금·저축</label>
+          <label><input type="checkbox" value="투자(변액)">투자 목적(변액)</label>
+          <label><input type="checkbox" value="어린이보험">어린이·태아</label>
+          <label><input type="checkbox" value="치아보험">치아</label>
+          <label><input type="checkbox" value="운전자보험">운전자</label>
+          <label><input type="checkbox" value="간병·치매">간병·치매</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>지병 (현재 앓고 있거나 치료받은 적 있는 것)</legend>
+        <div class="chips" data-name="diseases">
+          <label><input type="checkbox" value="고혈압">고혈압</label>
+          <label><input type="checkbox" value="당뇨">당뇨</label>
+          <label><input type="checkbox" value="고지혈증(이상지질혈증)">고지혈증</label>
+          <label><input type="checkbox" value="갑상선 질환">갑상선 질환</label>
+          <label><input type="checkbox" value="간 질환(지방간·간염)">간 질환</label>
+          <label><input type="checkbox" value="심장 질환(협심증·부정맥 등)">심장 질환</label>
+          <label><input type="checkbox" value="뇌혈관 질환(뇌졸중 등)">뇌혈관 질환</label>
+          <label><input type="checkbox" value="암(완치 포함)">암(완치 포함)</label>
+          <label><input type="checkbox" value="천식·호흡기 질환">천식·호흡기</label>
+          <label><input type="checkbox" value="디스크·관절 질환">디스크·관절</label>
+          <label><input type="checkbox" value="신장 질환">신장 질환</label>
+          <label><input type="checkbox" value="우울증·불안장애 등 정신건강">우울증·불안 등</label>
+          <label><input type="checkbox" value="위·장 질환(위염·용종 등)">위·장 질환</label>
+          <label><input type="checkbox" value="자궁·유방 질환(근종·결절 등)">자궁·유방 질환</label>
+        </div>
+        <label class="full">기타 (직접 입력)<input name="disease_other" placeholder="예: 통풍, 2023년 진단, 약 복용 중"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>수술 이력</legend>
+        <div class="radios" data-name="surgery">
+          <label><input type="radio" name="surgery" value="없음">없음</label>
+          <label><input type="radio" name="surgery" value="있음">있음</label>
+        </div>
+        <label class="full" id="surgeryDetail" hidden>어떤 수술, 언제?
+          <input name="surgery_detail" placeholder="예: 2022년 맹장 수술, 2024년 갑상선 결절 고주파 시술">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>보험 가입 때 흔히 묻는 질문 (계약 전 알릴 의무)</legend>
+        <div class="qa" data-q="q_3months">
+          <p>최근 <b>3개월</b> 이내에 의사에게 진찰·검사를 받고 질병 확정/의심 소견, 치료, 입원, 수술, 투약을 받은 적이 있나요?</p>
+          <span><label><input type="radio" name="q_3months" value="예">예</label><label><input type="radio" name="q_3months" value="아니오">아니오</label></span>
+        </div>
+        <div class="qa">
+          <p>최근 <b>1년</b> 이내 건강검진 등에서 추가검사(재검사) 소견을 받은 적이 있나요?</p>
+          <span><label><input type="radio" name="q_1year" value="예">예</label><label><input type="radio" name="q_1year" value="아니오">아니오</label></span>
+        </div>
+        <div class="qa">
+          <p>최근 <b>5년</b> 이내에 입원, 수술, 계속하여 7일 이상 치료, 30일 이상 투약을 받은 적이 있나요?</p>
+          <span><label><input type="radio" name="q_5years" value="예">예</label><label><input type="radio" name="q_5years" value="아니오">아니오</label></span>
+        </div>
+        <div class="qa">
+          <p>최근 <b>5년</b> 이내 암, 심장질환(협심증·심근경색), 뇌졸중, 간경화 등으로 진단·치료를 받은 적이 있나요?</p>
+          <span><label><input type="radio" name="q_cancer" value="예">예</label><label><input type="radio" name="q_cancer" value="아니오">아니오</label></span>
+        </div>
+        <div class="qa" id="pregnantRow">
+          <p>현재 임신 중인가요?</p>
+          <span><label><input type="radio" name="pregnant" value="예">예</label><label><input type="radio" name="pregnant" value="아니오">아니오</label></span>
+        </div>
+        <label class="full">"예"라고 답한 항목의 상세 내용
+          <input name="health_detail" placeholder="예: 2달 전 위내시경에서 용종 제거, 1년 전 검진에서 간수치 재검">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>생활 습관·직업</legend>
+        <div class="row">
+          <label>흡연
+            <select name="smoking"><option value="">선택</option><option>비흡연</option><option>흡연</option><option>과거 흡연</option></select>
+          </label>
+          <label>음주
+            <select name="drinking"><option value="">선택</option><option>안 함</option><option>주 1~2회</option><option>주 3회 이상</option></select>
+          </label>
+          <label>운전
+            <select name="driving"><option value="">선택</option><option>안 함</option><option>자가용</option><option>영업용·업무용</option><option>이륜차(오토바이)</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <label>직업<input name="job" placeholder="예: 사무직, 건설현장, 배달"></label>
+          <label>위험한 취미·활동<input name="risky" placeholder="예: 스쿠버다이빙, 암벽등반"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>그 밖에</legend>
+        <label class="full">이미 가입한 보험<input name="existing" placeholder="예: 실손보험(2019년 가입), 종신보험"></label>
+        <label class="full">특히 궁금한 점<textarea name="note" rows="2" placeholder="예: 갑상선 결절이 있는데 암 진단금 받을 수 있는지"></textarea></label>
+      </fieldset>
+    </form>
+  </section>
+
+  <div class="actions">
+    <button id="run" class="primary" disabled>요약 시작</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <!-- 결과 -->
+  <section class="card" id="resultCard" hidden>
+    <div class="result-head">
+      <h2>요약 결과</h2>
+      <div>
+        <button id="copy" class="ghost">복사</button>
+        <button id="print" class="ghost">인쇄 / PDF 저장</button>
+      </div>
+    </div>
+    <article id="result" class="md"></article>
+
+    <div class="ask">
+      <h3>추가 질문</h3>
+      <div class="ask-row">
+        <input id="question" placeholder="예: 갑상선암은 일반암으로 보장되나요? / 2년 안에 해지하면 얼마 돌려받나요?">
+        <button id="askBtn" class="primary">질문하기</button>
+      </div>
+      <div id="answers"></div>
+    </div>
+  </section>
+
+  <p class="disclaimer">
+    이 요약은 AI가 약관을 읽고 만든 참고 자료이며, 실제 보장 여부와 가입 가능 여부는 보험사의 심사와 약관 원문에 따릅니다.
+    중요한 결정 전에는 반드시 약관 원문과 보험사/설계사에게 확인하세요.
+    입력한 건강 정보는 요약을 만들기 위해 AI(Anthropic Claude API)로 전송되며, 이 사이트 서버에는 저장되지 않습니다.
+  </p>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
