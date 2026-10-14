@@ -5,16 +5,20 @@
 
 const PYODIDE_VERSION = "0.26.4";
 const CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-// 같은 곳에 pyodide/ 폴더를 함께 올리면(인터넷 CDN이 막힌 곳) 그 파일을 씁니다.
+// 같은 곳에 pyodide/ 묶음(make_bundle.py 로 만든 것)을 함께 올리면 인터넷 CDN 대신 그 파일을 씁니다.
 const LOCAL = new URL("pyodide/", self.location).href;
-const PURE_WHEELS = [
-  "openpyxl-3.1.5-py2.py3-none-any.whl",
-  "et_xmlfile-2.0.0-py3-none-any.whl",
-  "pdfminer.six-20231228-py3-none-any.whl",
-  "pdfplumber-0.11.4-py3-none-any.whl",
-];
-const PANDAS_WHEEL = "pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl";
-const PANDAS_PARTS = ["pandas.whl.part0", "pandas.whl.part1"];
+
+// 묶음 모드에는 cryptography 가 없음: pdfminer 는 AES 암호화 PDF 에만 쓰므로 그때만 오류를 내는 대역을 둠
+const CRYPTO_STUB = {
+  "cryptography/__init__.py": "",
+  "cryptography/hazmat/__init__.py": "",
+  "cryptography/hazmat/backends/__init__.py": "def default_backend():\n    return None\n",
+  "cryptography/hazmat/primitives/__init__.py": "",
+  "cryptography/hazmat/primitives/ciphers/__init__.py":
+    "def _no(*a, **k):\n    raise RuntimeError('AES로 암호화된 PDF는 웹에서 읽을 수 없습니다. Spyder에서 실행해 주세요.')\n" +
+    "class _NS:\n    def __getattr__(self, name):\n        return _no\n" +
+    "Cipher = _no\nalgorithms = _NS()\nmodes = _NS()\n",
+};
 
 const status = (text) => postMessage({ type: "status", text });
 const log = (m) => postMessage({ type: "log", m: String(m) });
@@ -25,12 +29,26 @@ async function fetchOk(url, opts) {
   return r;
 }
 
-async function hasLocalBundle() {
+async function localBundle() {
   try {
-    return (await fetch(LOCAL + "pyodide-lock.json", { method: "HEAD" })).ok;
+    const r = await fetch(LOCAL + "bundle.json");
+    return r.ok ? await r.json() : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+// base64 글자 조각들 → 원래 파일 바이트
+async function partsToBytes(item) {
+  const chunks = await Promise.all(item.parts.map(async (p) => {
+    const bin = atob(await (await fetchOk(LOCAL + p)).text());
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }));
+  const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  chunks.reduce((off, c) => (all.set(c, off), off + c.length), 0);
+  return all;
 }
 
 async function fetchText(...urls) {
@@ -43,25 +61,24 @@ async function fetchText(...urls) {
 }
 
 async function boot() {
-  const local = await hasLocalBundle();
-  const base = local ? LOCAL : CDN;
+  const bundle = await localBundle();
   status("Python 불러오는 중");
-  importScripts(base + "pyodide.js");
-  const py = await loadPyodide({ indexURL: base });
-
-  status("pandas · openpyxl · pdfplumber 설치 중");
-  const deps = ["numpy", "python-dateutil", "pytz", "six", "tzdata", "micropip", "cryptography", "charset-normalizer"];
-  if (local) {
-    await py.loadPackage(deps.concat(PURE_WHEELS.map((w) => LOCAL + w)));
-    // pandas 휠은 올릴 수 있는 파일 크기 제한 때문에 둘로 나눠 둠 → 합쳐서 설치
-    const parts = await Promise.all(PANDAS_PARTS.map(async (p) => new Uint8Array(await (await fetchOk(LOCAL + p)).arrayBuffer())));
-    const whl = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-    parts.reduce((off, p) => (whl.set(p, off), off + p.length), 0);
-    py.FS.writeFile("/tmp/" + PANDAS_WHEEL, whl);
-    const micropip = py.pyimport("micropip");
-    await micropip.install.callKwargs("emfs:/tmp/" + PANDAS_WHEEL, { deps: false });
+  let py;
+  if (bundle) {
+    importScripts(LOCAL + "pyodide.js");
+    const stdlib = URL.createObjectURL(new Blob([await partsToBytes(bundle.stdlib)]));
+    py = await loadPyodide({ indexURL: LOCAL, stdLibURL: stdlib });
+    status("pandas · openpyxl · pdfplumber 설치 중");
+    for (const w of bundle.wheels) py.unpackArchive(await partsToBytes(w), "wheel");
+    for (const [path, src] of Object.entries(CRYPTO_STUB)) {
+      py.FS.mkdirTree("/app/" + path.slice(0, path.lastIndexOf("/")));
+      py.FS.writeFile("/app/" + path, src);
+    }
   } else {
-    await py.loadPackage(deps.concat(["pandas"]));
+    importScripts(CDN + "pyodide.js");
+    py = await loadPyodide({ indexURL: CDN });
+    status("pandas · openpyxl · pdfplumber 설치 중");
+    await py.loadPackage(["pandas", "micropip", "cryptography", "charset-normalizer"]);
     const micropip = py.pyimport("micropip");
     await micropip.install(["openpyxl==3.1.5", "pdfminer.six==20231228"]);
     // pdfplumber 의 그림 기능(pypdfium2)은 쓰지 않으므로 의존성 없이 설치
@@ -72,7 +89,7 @@ async function boot() {
   py.FS.mkdirTree("/app");
   py.FS.writeFile("/app/benefit_extractor.py", await fetchText("benefit_extractor.py", "../benefit_extractor.py"));
   py.FS.writeFile("/app/web_runner.py", await fetchText("web_runner.py"));
-  py.runPython("import sys; sys.path.insert(0, '/app'); import web_runner");
+  py.runPython("import sys, importlib; sys.path.insert(0, '/app'); importlib.invalidate_caches(); import web_runner");
   return py;
 }
 

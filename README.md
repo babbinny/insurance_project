@@ -16,6 +16,6 @@ python -m http.server 8000
 ```
 
 브라우저에서 `http://localhost:8000/web/` 을 엽니다. 처음 열 때 Python 실행 파일(약 40MB)을 인터넷(jsDelivr)에서 받습니다.
-인터넷이 막힌 곳에서는 Pyodide 0.26.4 파일과 휠들을 `web/pyodide/` 에 두면 그 파일을 씁니다 (`web/worker.js` 맨 위 목록 참고).
+인터넷이 막힌 곳에서는 `web/make_bundle.py` 로 Pyodide 묶음을 `web/pyodide/` 에 만들어 두면 그 파일을 씁니다 (사용법은 파일 맨 위 설명).
 
 웹에서는 PC의 Word를 쓸 수 없어 문서보안(DRM) 파일과 `.doc` 는 읽지 못합니다. 이런 파일은 Spyder에서 실행하세요.
