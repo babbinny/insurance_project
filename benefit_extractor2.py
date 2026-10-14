@@ -39,17 +39,36 @@ HEADER_BENEFIT = ["급부명", "급부명칭", "보험금종류", "급부"]     
 HEADER_REASON = ["지급사유"]                                      # 지급사유 칸 이름 후보
 HEADER_AMOUNT = ["지급금액", "지급액"]                             # 지급금액 칸 이름 후보
 
-# 산출기준: 지급금액 문구에 들어 있는 단어 → 코드 (위에서부터 먼저 판정)
-#   코드를 모르는 것은 "확인" 으로 두면 '확인필요'로 표시됩니다.
+# 산출기준 코드표 (회사 산출기준)
+CALC_BASIS_CODES = {
+    "01": "보험가입금액 기준",
+    "02": "보험료 (거치형 일시납, 기본보험료) 기준",
+    "03": "기납입보험료",
+    "10": "MAX(보험가입금액, 기납입보험료 합계) * 추가설계 사망보험금 비율",
+    "95": "1구좌(보험료 천만원기준)",
+    "96": "1구좌(보험료 1억원기준)",
+    "97": "1구좌(보험료 5천만원 기준)",
+    "98": "1구좌 (보험료 백만원기준)",
+}
+
+# 산출기준 판정: 지급금액 문구(공백 제거)에서 위에서부터 먼저 맞는 규칙의 코드
+#   (정규식, 코드). 코드를 모르는 것은 "확인" → '확인필요'로 표시
+#   "구좌" 는 1구좌 보험료(천만원/1억원/5천만원/백만원)를 찾아 95~98 로 정함 (UNIT_PREMIUM_CODES)
 CALC_BASIS_RULES = [
-    ("월납", "02"),              # 월납보험료, [월납]
-    ("연납", "02"),              # 연납보험료, [연납]
-    ("기납입보험료", "03"),
-    ("납입보험료", "03"),        # 총 납입보험료
-    ("계약자적립액", "확인"),
-    ("보험가입금액", "01"),
-    ("가입금액", "01"),
+    (r"(?i)max\(", "10"),                                          # MAX(보험가입금액, 기납입보험료)
+    (r"가입금액.{0,20}기납입보험료.{0,20}(?:중|큰|많은|최대)", "10"),  # 가입금액과 기납입보험료 중 큰 금액
+    (r"기납입보험료.{0,20}가입금액.{0,20}(?:중|큰|많은|최대)", "10"),
+    (r"추가설계", "10"),                                            # 추가설계 사망보험금 비율
+    (r"구좌", "구좌"),                                              # 1구좌당 …
+    (r"기납입보험료|이미납입한보험료|납입한보험료|총납입보험료", "03"),
+    (r"월납|연납|3월납|6월납|일시납|기본보험료|거치", "02"),          # [월납] 월납보험료, 일시납보험료, 기본보험료
+    (r"납입보험료", "03"),
+    (r"계약자적립액", "확인"),
+    (r"보험가입금액|가입금액", "01"),
+    (r"보험료(?!.{0,6}면제)", "02"),                                # 그 밖의 '보험료' (납입면제 문구는 제외)
 ]
+# 1구좌 보험료(원) → 산출기준 코드
+UNIT_PREMIUM_CODES = {10 ** 7: "95", 10 ** 8: "96", 5 * 10 ** 7: "97", 10 ** 6: "98"}
 
 # 지급금액이 '5,000만원'처럼 금액으로 적힌 표: 표 위 "[기준: 보험가입금액 5,000만원]"으로 나눠 지급율 계산
 #   예) 기준 5,000만원 → 지급금액 5,000만원 = 1, 500만원 = 0.1
@@ -617,11 +636,38 @@ def find_base_amount(texts):
     return None, ""
 
 
-def get_basis(amount_text):
+def find_unit_premium(texts):
+    """'1구좌(보험료 1,000만원 기준)', '[기준: 1구좌 = 보험료 1억원]' → (1구좌 보험료(원), 근거). 못 찾으면 (None, '')"""
+    for t in texts:
+        s = nospace(t).replace(",", "")
+        if "구좌" not in s:
+            continue
+        s = re.sub(r"(?<![\d.])(억|천만|백만|십만)원", r"1\1원", s)      # '천만원' → '1천만원'
+        m = re.search(r"구좌.{0,15}?보험료(.{0,20})", s)
+        money = find_money(m.group(1)) if m else []
+        if money:
+            return money[0], clean(t)
+    return None, ""
+
+
+def _unit_basis(unit_premium):
+    code = UNIT_PREMIUM_CODES.get(unit_premium)
+    if code:
+        return code, f"1구좌(보험료 {int(unit_premium):,}원)"
+    if unit_premium:
+        return "확인", f"1구좌 보험료 {int(unit_premium):,}원은 산출기준표에 없음"
+    return "확인", "1구좌 보험료를 못 찾음"
+
+
+def get_basis(amount_text, unit_premium=None):
+    """지급금액 → (산출기준 코드, 근거 문구). unit_premium: 지급사유·지급금액에 '구좌'가 있을 때 찾은 1구좌 보험료"""
     t = nospace(amount_text)
-    for word, code in CALC_BASIS_RULES:
-        if word in t:
-            return code, word
+    for pat, code in CALC_BASIS_RULES:
+        m = re.search(pat, t)
+        if m:
+            return _unit_basis(unit_premium) if code == "구좌" else (code, m.group(0))
+    if unit_premium:                         # 지급사유에만 '1구좌'가 있고 지급금액은 금액만 적힌 경우
+        return _unit_basis(unit_premium)
     if find_money(amount_text):              # '5,000만원' 처럼 금액만 적힌 경우
         return MONEY_BASIS_CODE, "금액"
     return "확인", ""
@@ -635,14 +681,14 @@ def get_rate(amount_text, base=None):
     if len(pcts) > 1:
         return round(float(pcts[0]) / 100, 4), f"지급금액에 %가 여러 개({', '.join(pcts)}%)"
     money = find_money(amount_text)
-    if money:                                # 금액 ÷ 기준 보험가입금액
+    if money:                                # 금액 ÷ 기준금액 (보험가입금액 또는 1구좌 보험료)
         if not base:
             return None, "지급금액이 금액인데 [기준: 보험가입금액] 을 못 찾음"
         memo = f"지급금액에 금액이 여러 개({len(money)}개)" if len(money) > 1 else ""
         return round(money[0] / base, 4), memo
     t = nospace(amount_text)
     # "보험가입금액", "총 납입보험료", "월납보험료" 처럼 기준만 적혀 있으면 100% 로 봄
-    if any(w in t for w, _ in CALC_BASIS_RULES) and not re.search(r"\d", t):
+    if any(re.search(p, t) for p, _ in CALC_BASIS_RULES) and not re.search(r"\d", t):
         return 1.0, ""
     return None, "지급금액에 % / 금액이 없음"
 
@@ -817,11 +863,15 @@ def extract_file(path, codes, log, word_reader):
                 prev_p = [blocks[k][1] for k in range(bi - 1, max(-1, bi - 6), -1) if blocks[k][0] == "p"]
                 title = next((p for p in prev_p if "별표" in p or "지급기준표" in nospace(p)),
                              prev_p[0] if prev_p else "")
-                near = [blocks[k][1] for k in range(bi - 1, max(-1, bi - 6), -1) if blocks[k][0] == "p"]
+                near = []                  # 표 바로 위 문단 (앞 표를 넘어가지 않음: 앞 표의 [기준: …] 을 가져오지 않도록)
+                for k in range(bi - 1, max(-1, bi - 6), -1):
+                    if blocks[k][0] != "p":
+                        break
+                    near.append(blocks[k][1])
                 near += [" ".join(r) for r in data[:hdr_i]]
                 base, base_src = find_base_amount(near)
                 cur = {"title": title, "product": product or file_product,
-                       "base": base, "base_src": base_src,
+                       "base": base, "base_src": base_src, "near": near,
                        "section": (product_idx, bi),
                        "width": width, "start": bi, "end": bi, "rows": [],
                        "c": (find_col(header, HEADER_BENEFIT), find_col(header, HEADER_REASON),
@@ -875,7 +925,7 @@ def extract_file(path, codes, log, word_reader):
             if base is None and find_money(amount):     # 표 근처에 없으면 특약 본문에서 '기준' 문구 찾기
                 base, base_src = find_base_amount(section.split("\n") + notes.split("\n"))
             benefits.append(parse_benefit(path, g["product"], g["title"], name, reason, amount,
-                                          notes, section, whole, codes, base, base_src))
+                                          notes, section, whole, codes, base, base_src, g["near"]))
 
     tag = {"Word": " (Word로 읽음)", "PDF": " (PDF)"}.get(how, "")
     n_prod = len({g["product"] for g in groups})
@@ -884,12 +934,17 @@ def extract_file(path, codes, log, word_reader):
 
 
 def parse_benefit(path, product, title, raw_name, reason, amount, notes, section, whole, codes,
-                  base=None, base_src=""):
+                  base=None, base_src="", near=()):
     name, article = split_name(raw_name)
     both = reason + " " + amount
     memo = []
 
-    basis, basis_word = get_basis(amount)
+    unit, unit_src = None, ""
+    if "구좌" in nospace(both):              # 1구좌 보험료: 지급금액·지급사유 → 표 근처 → 특약 본문 → (주) 순서로 찾음
+        unit, unit_src = find_unit_premium([amount, reason] + list(near) + section.split("\n") + notes.split("\n"))
+    basis, basis_word = get_basis(amount, unit)
+    if basis in UNIT_PREMIUM_CODES.values():
+        base, base_src = unit, unit_src      # 금액으로 적힌 지급금액은 1구좌 보험료로 나눠 지급율 계산
     if basis == "확인":
         memo.append(f"산출기준 코드 확인({basis_word or '문구 없음'})")
     rate, rate_memo = get_rate(amount, base)
@@ -920,7 +975,7 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
         "감액기간(년)": red_years, "감액비율": red_ratio, "감액방식": red_mode,
         "면책기간": wait, "적립금지급여부": once,
         "확인필요": " / ".join(memo),
-        "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
+        "근거_산출기준": basis_word, "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
         "원문_지급사유": reason, "원문_지급금액": amount,
     }
 
