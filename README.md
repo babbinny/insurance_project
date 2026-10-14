@@ -7,7 +7,13 @@ Spyder에서 F5로 띄우던 창과 같은 화면을 웹페이지로 만든 것�
 - `web/index.html` : 화면 (약관 폴더/파일 · 급부코드표 선택 → 실행/중단 → 로그 → 결과 시트 미리보기 → 엑셀 내려받기)
 - `web/worker.js` : 브라우저 안에서 Python·pandas·openpyxl·pdfplumber 를 불러와 `run()` 을 실행
 - `web/web_runner.py` : `run()` 결과 엑셀을 화면 미리보기용으로 바꾸는 연결 코드
-- `web/sample/sample_policy.docx` : 시연용 가상 약관 ([예제 약관으로 실행] 버튼)
+- `web/sample/sample_policy.docx`, `web/sample/sample_revision.xlsx` : 시연용 가상 약관과 개정 양식 예제
+
+페이지에는 탭이 두 개 있습니다.
+
+- **약관에서 추출**: 상품 약관(PDF·Word) → 통계테이블 초안 (`benefit_extractor2.py`)
+- **개정 후 자동화**: 기존 통계테이블 + 상품코드 변경 → 개정 후 통계테이블 (`stat_builder.py`).
+  예제 양식은 `web/sample/sample_revision.xlsx` 입니다.
 
 로컬에서 보기 (저장소 폴더에서):
 

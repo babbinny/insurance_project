@@ -1,6 +1,6 @@
-// 브라우저 안에서 Python(Pyodide)을 띄워 benefit_extractor2.py 를 그대로 실행하는 작업자.
+// 브라우저 안에서 Python(Pyodide)을 띄워 benefit_extractor2.py / stat_builder.py 를 그대로 실행하는 작업자.
 // 화면(index.html)과 메시지로 주고받습니다:
-//   화면 → {type:"run", files:[{path, data}], code:{name, data}|null}
+//   화면 → {type:"run", tool:"extract"|"revise", files:[{path, data}], code:{name, data}|null}
 //   작업자 → {type:"status"|"log"|"done"|"error", ...}
 
 const PYODIDE_VERSION = "0.26.4";
@@ -88,6 +88,7 @@ async function boot() {
   status("3/3");
   py.FS.mkdirTree("/app");
   py.FS.writeFile("/app/benefit_extractor2.py", await fetchText("benefit_extractor2.py", "../benefit_extractor2.py"));
+  py.FS.writeFile("/app/stat_builder.py", await fetchText("stat_builder.py", "../stat_builder.py"));
   py.FS.writeFile("/app/web_runner.py", await fetchText("web_runner.py"));
   py.runPython("import sys, importlib; sys.path.insert(0, '/app'); importlib.invalidate_caches(); import web_runner");
   return py;
@@ -131,22 +132,30 @@ self.onmessage = async (ev) => {
       codePath = dir + "/" + msg.code.name;
       py.FS.writeFile(codePath, new Uint8Array(msg.code.data));
     }
-    const runJob = py.globals.get("web_runner").run_job;
     // 브라우저 안 임시 경로(/work/job1/...)는 화면에 보이지 않게 뗌
     const tidy = (s) => String(s).split(outDir + "/").join("").split(inDir + "/").join("");
-    const res = runJob.callKwargs(inDir, outDir, codePath, { log: (m) => log(tidy(m)) });
+    const logFn = { log: (m) => log(tidy(m)) };
+    const runner = py.globals.get("web_runner");
+    let res;
+    if (msg.tool === "revise") {
+      // 개정 후 자동화: 양식 엑셀 1개 → stat_builder.build()
+      res = runner.build_job.callKwargs(inDir + "/" + msg.files[0].path, outDir, logFn);
+    } else {
+      // 약관에서 추출: benefit_extractor2.run()
+      res = runner.run_job.callKwargs(inDir, outDir, codePath, logFn);
+    }
     const [path, sheets] = res.toJs();
     res.destroy();
-    runJob.destroy();
+    runner.destroy();
     const bytes = py.FS.readFile(path);
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    postMessage({ type: "done", name: path.split("/").pop(), xlsx: buf, sheets: tidy(sheets) }, [buf]);
+    postMessage({ type: "done", tool: msg.tool, name: path.split("/").pop(), xlsx: buf, sheets: tidy(sheets) }, [buf]);
   } catch (e) {
     let m = String(e && e.message ? e.message : e);
     // Python 오류는 마지막 줄(예: RuntimeError: Word/PDF 파일을 찾지 못했습니다.)만 보여줌
     const lines = m.trim().split("\n");
     if (lines.length > 1 && /Error|Exception/.test(lines[lines.length - 1])) m = lines[lines.length - 1].replace(/^\w+(Error|Exception):\s*/, "");
-    postMessage({ type: "error", message: m });
+    postMessage({ type: "error", tool: msg.tool, message: m });
   } finally {
     try {
       py.runPython(`import shutil; shutil.rmtree(${JSON.stringify(dir)}, ignore_errors=True)`);

@@ -1,10 +1,10 @@
 <meta charset="utf-8">
-<title>약관 지급기준표 추출</title>
+<title>통계테이블 작성 도구</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
 <style>
-/* 레이아웃: 회사 홈페이지 서브페이지 형식 — 흰 상단 메뉴 + 청록 밑줄, 오른쪽 위 경로, 왼쪽 메뉴, 청록 제목, 청록 띠 */
+/* 레이아웃: 회사 홈페이지 서브페이지 형식 — 흰 상단 메뉴 + 청록 밑줄, 오른쪽 위 경로, 왼쪽 메뉴, 청록 제목, 기능 탭 2개, 청록 띠 */
 /* 회사 홈페이지와 같은 밝은 화면 하나로 고정 (다크 모드 없음) */
 :root {
   color-scheme: light;
@@ -133,8 +133,24 @@ button.link { border: none; background: none; padding: 4px; color: var(--teal); 
 .sheet-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 10px 16px; font-size: 0.85rem; color: var(--muted); border-bottom: 1px solid var(--line); }
 .sheet-tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .sheet-tools input { accent-color: var(--teal); }
-.legend { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 14px; height: 14px; background: var(--check); border: 1px solid var(--line-strong); display: inline-block; }
+.step a, .lead a { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+.legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; border: 1px solid var(--line-strong); display: inline-block; }
+.more { padding: 8px 16px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); }
+
+/* 기능 탭 */
+.tooltabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 26px; border-bottom: 3px solid var(--teal); }
+.tooltab { text-align: left; padding: 16px 22px; border: 1px solid var(--line-strong); border-bottom: none; background: var(--panel); color: var(--muted); display: grid; gap: 2px; }
+.tooltab + .tooltab { border-left: none; }
+.tooltab b { font-size: 1.15rem; font-weight: 700; color: var(--ink-strong); }
+.tooltab small { font-size: 0.85rem; }
+.tooltab:hover:not(:disabled) { color: var(--teal); }
+.tooltab[aria-selected="true"] { background: var(--teal); border-color: var(--teal); color: var(--white); }
+.tooltab[aria-selected="true"] b { color: var(--white); }
+.panel { margin-top: 30px; }
+.sheets-list { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--muted); }
+.sheets-list b { color: var(--ink); font-weight: 500; }
 .grid-wrap { overflow: auto; max-height: 560px; }
 table { border-collapse: collapse; font-size: 0.85rem; min-width: 100%; }
 th, td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
@@ -143,7 +159,7 @@ td { white-space: nowrap; }
 td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.long { white-space: normal; min-width: 260px; max-width: 440px; }
 td.rowno, th.rowno { color: var(--muted); text-align: right; font: 0.75rem var(--mono); background: var(--panel); }
-tr.need td:not(.rowno) { background: var(--check); color: var(--check-ink); }
+tr.marked td:not(.rowno) { color: var(--ink-strong); }
 .empty-sheet { padding: 28px; text-align: center; color: var(--muted); }
 
 .notes { margin: 0; padding: 18px 22px 18px 38px; background: var(--panel); border-top: 2px solid var(--ink-strong); display: grid; gap: 6px; font-size: 0.93rem; }
@@ -157,6 +173,8 @@ tr.need td:not(.rowno) { background: var(--check); color: var(--check-ink); }
   .lnb .sub { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: none; }
   .page-title { font-size: 1.8rem; }
   .steps { grid-template-columns: minmax(0, 1fr); }
+  .tooltab { padding: 12px 14px; }
+  .tooltab small { display: none; }
   .step + .step { border-left: none; border-top: 1px solid var(--line); }
 }
 @media (max-width: 640px) {
@@ -171,16 +189,15 @@ tr.need td:not(.rowno) { background: var(--check); color: var(--check-ink); }
 }
 @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } html { scroll-behavior: auto; } }
 html { scroll-behavior: smooth; }
+.gnb nav a.cur { color: var(--teal); border-bottom-color: var(--teal); }
 </style>
 
 <header class="gnb">
   <div class="gnb-in">
-    <a class="brand" href="#top" id="top"><span id="logo-slot"></span>약관 지급기준표 추출</a>
-    <nav aria-label="바로가기">
-      <a href="#guide">사용 방법</a>
-      <a href="#run-section">약관 선택</a>
-      <a href="#result">결과 확인</a>
-      <a href="#notes">알아두세요</a>
+    <a class="brand" href="#extract"><span id="logo-slot"></span>통계테이블 작성 도구</a>
+    <nav aria-label="기능">
+      <a href="#extract" data-tool-link="extract">약관에서 추출</a>
+      <a href="#revise" data-tool-link="revise">개정 후 자동화</a>
     </nav>
     <div class="state" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">준비 중</span></div>
   </div>
@@ -189,7 +206,7 @@ html { scroll-behavior: smooth; }
 <div class="page">
   <div class="crumb">
     <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 1 7.6h2.1V14h3.6V10h2.6v4h3.6V7.6H15z"/></svg>
-    <span>&gt; 업무도구 &gt;</span><b>약관 지급기준표 추출</b>
+    <span>&gt; 업무도구 &gt; 통계테이블 작성 &gt;</span><b id="crumb-tool">약관에서 추출</b>
   </div>
 
   <div class="layout">
@@ -197,137 +214,220 @@ html { scroll-behavior: smooth; }
       <h2>업무도구</h2>
       <ul>
         <li class="on">
-          <a href="#guide">약관 지급기준표 추출 <i class="chev"></i></a>
+          <a href="#extract">통계테이블 작성 <i class="chev"></i></a>
           <ul class="sub">
-            <li><a href="#guide" class="cur">- 사용 방법</a></li>
-            <li><a href="#run-section">약관 선택 · 실행</a></li>
-            <li><a href="#result">결과 확인</a></li>
-            <li><a href="#notes">알아두세요</a></li>
+            <li><a href="#extract" data-tool-link="extract">약관에서 추출</a></li>
+            <li><a href="#revise" data-tool-link="revise">개정 후 자동화</a></li>
           </ul>
         </li>
       </ul>
     </aside>
 
     <main>
-      <h1 class="page-title">약관 지급기준표 추출</h1>
-      <p class="lead">상품 약관에서 보험금 지급기준표를 찾아 <b>통계테이블 초안 엑셀</b>을 만들어 드립니다.</p>
+      <h1 class="page-title">통계테이블 작성</h1>
 
-      <div class="steps" id="guide">
-        <div class="step">
-          <span class="no">STEP 1</span>
-          <h3>약관 내려받기</h3>
-          <p><b>하나생명 홈페이지 → 상품공시실</b>에서 상품 약관(PDF)을 내려받습니다. 상품별 Word 약관(.docx)도 됩니다.</p>
-        </div>
-        <div class="step">
-          <span class="no">STEP 2</span>
-          <h3>약관 선택 후 실행</h3>
-          <p>약관 파일이나 폴더를 고르고 <b>[실행]</b>을 누릅니다. 급부코드표가 있으면 함께 고르세요.</p>
-        </div>
-        <div class="step">
-          <span class="no">STEP 3</span>
-          <h3>결과 확인 · 내려받기</h3>
-          <p><b>노란색 행</b>은 확인이 필요한 항목입니다. 엑셀로 내려받아 검토하세요.</p>
-        </div>
+      <div class="tooltabs" role="tablist" aria-label="기능 선택">
+        <button type="button" class="tooltab" role="tab" id="tab-extract" data-tool="extract" aria-controls="panel-extract">
+          <b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small>
+        </button>
+        <button type="button" class="tooltab" role="tab" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
+          <b>개정 후 자동화</b><small>기존 통계테이블 + 상품코드 변경 → 개정 후 테이블</small>
+        </button>
       </div>
 
-      <section class="sec" id="run-section" aria-label="약관 선택">
-        <h2 class="sec-title">약관 선택 · 실행</h2>
-        <div class="runbox">
-          <div class="band"><strong>약관 파일 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
-          <div class="form">
-            <label class="k" for="pick-dir">약관 파일</label>
-            <div class="field empty" id="src-field"><span id="src-text">PDF·Word 약관을 고르거나 여기로 끌어다 놓으세요</span></div>
-            <div class="btns">
-              <button type="button" id="pick-file">파일 선택</button>
-              <button type="button" id="pick-dir">폴더 선택</button>
-            </div>
-
-            <label class="k" for="pick-code">급부코드표 <small>(선택)</small></label>
-            <div class="field empty" id="code-field"><span id="code-text">엑셀(.xlsx) · 첫 열 급부코드, 둘째 열 급부코드명</span></div>
-            <div class="btns">
-              <button type="button" id="pick-code">파일 선택</button>
-              <button type="button" id="clear-code" hidden>지우기</button>
-            </div>
-          </div>
-          <input class="hidden-input" type="file" id="in-dir" webkitdirectory multiple>
-          <input class="hidden-input" type="file" id="in-file" multiple accept=".docx,.docm,.doc,.pdf">
-          <input class="hidden-input" type="file" id="in-code" accept=".xlsx,.xls">
-
-          <div class="bar">
-            <button type="button" class="primary" id="run" disabled>실행</button>
-            <button type="button" class="ghost" id="stop" disabled>중단</button>
-            <button type="button" class="link" id="run-sample" disabled>예제 약관으로 해 보기</button>
-          </div>
-          <p class="notice" id="msg" hidden></p>
-          <div class="console" id="log" aria-live="polite" tabindex="0"></div>
+      <!-- ===================== 약관에서 추출 ===================== -->
+      <div class="panel" id="panel-extract" role="tabpanel" aria-labelledby="tab-extract">
+        <p class="lead">상품 약관에서 보험금 지급기준표를 찾아 <b>통계테이블 초안 엑셀</b>을 만들어 드립니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
+            <p><b>하나생명 홈페이지 → 상품공시실</b>에서 상품 약관(PDF)을 내려받습니다. 상품별 Word 약관(.docx)도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>약관 선택 후 실행</h3>
+            <p>약관 파일이나 폴더를 고르고 <b>[실행]</b>을 누릅니다. 급부코드표가 있으면 함께 고르세요.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>결과 확인 · 내려받기</h3>
+            <p><b>노란색 행</b>은 확인이 필요한 항목입니다. 엑셀로 내려받아 검토하세요.</p></div>
         </div>
-      </section>
 
-      <section class="sec" id="result" aria-label="결과">
-        <h2 class="sec-title">결과 확인 <span class="tag" id="result-tag">예제 결과</span></h2>
-        <div>
-          <div class="result-bar">
-            <div style="min-width:0">
-              <div class="fname" id="result-name"></div>
-              <div class="stats" id="stats"></div>
+        <section class="sec" aria-label="약관 선택">
+          <h2 class="sec-title">약관 선택 · 실행</h2>
+          <div class="runbox">
+            <div class="band"><strong>약관 파일 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
+            <div class="form">
+              <label class="k" for="x-pick-file">약관 파일</label>
+              <div class="field empty" id="x-src-field"><span id="x-src-text">PDF·Word 약관을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns">
+                <button type="button" id="x-pick-file">파일 선택</button>
+                <button type="button" id="x-pick-dir">폴더 선택</button>
+              </div>
+              <label class="k" for="x-pick-code">급부코드표 <small>(선택)</small></label>
+              <div class="field empty" id="x-code-field"><span id="x-code-text">엑셀(.xlsx) · 첫 열 급부코드, 둘째 열 급부코드명</span></div>
+              <div class="btns">
+                <button type="button" id="x-pick-code">파일 선택</button>
+                <button type="button" id="x-clear-code" hidden>지우기</button>
+              </div>
             </div>
-            <button type="button" class="primary" id="download">엑셀 내려받기</button>
-          </div>
-          <div class="sheet">
-            <div class="tabs" role="tablist" id="tabs"></div>
-            <div class="sheet-tools" id="sheet-tools">
-              <span class="legend"><i></i>확인필요 행 (엑셀에서도 노란색)</span>
-              <label><input type="checkbox" id="only-check"> 확인필요만 보기</label>
+            <input class="hidden-input" type="file" id="x-in-dir" webkitdirectory multiple>
+            <input class="hidden-input" type="file" id="x-in-file" multiple accept=".docx,.docm,.doc,.pdf">
+            <input class="hidden-input" type="file" id="x-in-code" accept=".xlsx,.xls">
+            <div class="bar">
+              <button type="button" class="primary" id="x-run" disabled>실행</button>
+              <button type="button" class="ghost" id="x-stop" disabled>중단</button>
+              <button type="button" class="link" id="x-sample" disabled>예제 약관으로 해 보기</button>
             </div>
-            <div class="grid-wrap" id="grid" role="tabpanel"></div>
+            <p class="notice" id="x-msg" hidden></p>
+            <div class="console" id="x-log" aria-live="polite" tabindex="0"></div>
           </div>
+        </section>
+
+        <section class="sec" id="x-result" aria-label="추출 결과">
+          <h2 class="sec-title">결과 확인 <span class="tag" id="x-tag">예제 결과</span></h2>
+          <div class="result" id="x-view"></div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li><b>엑셀 시트</b>: 초안(통계테이블 형식) · 특약별요약 · 급부원문(원문과 근거) · 처리결과(파일별 성공/실패)</li>
+            <li>감액이 있으면 경과 구간을 나눕니다. 예) 0~12개월 : 50% / 13~999개월 : 100%</li>
+            <li>문서보안(DRM)이 걸린 파일과 <b>.doc</b> 파일은 읽을 수 없습니다. PDF나 .docx로 올려 주세요.</li>
+            <li>처음 열 때 준비에 1분 정도 걸립니다. 1,500쪽 PDF는 5분 안팎 걸립니다.</li>
+            <li>중단하면 처리 중이던 결과는 저장되지 않습니다.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ===================== 개정 후 자동화 ===================== -->
+      <div class="panel" id="panel-revise" role="tabpanel" aria-labelledby="tab-revise" hidden>
+        <p class="lead">개정 전 통계테이블을 바탕으로, 상품코드만 바뀐 상품의 <b>개정 후 통계테이블</b>을 자동으로 채웁니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>양식 엑셀 준비</h3>
+            <p>시트 5개를 순서대로 둔 엑셀을 준비합니다.</p>
+            <ol class="sheets-list">
+              <li><b>통계테이블 작성 대상</b> (채워질 곳)</li>
+              <li><b>통계테이블 기존</b> (개정 전)</li>
+              <li><b>주보종-개별상품 관계</b> (SP_SPCD, SP_SPCD1)</li>
+              <li><b>변경전·후 상품코드</b> (변경전, 변경후)</li>
+              <li><b>급부코드 체계</b> (급부코드, 급부명)</li>
+            </ol>
+            <p><button type="button" class="link" id="r-template">예제 양식 내려받기</button></p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>양식 선택 후 실행</h3>
+            <p>양식 엑셀을 고르고 <b>[실행]</b>을 누릅니다. 바뀐 상품코드를 따라 기존 행을 이어받아 1번 시트를 채웁니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>검토 · 내려받기</h3>
+            <p><b>검토_상품코드</b> 시트의 색 표시된 상품은 직접 확인하거나 약관을 보고 작성합니다.</p></div>
         </div>
-      </section>
 
-      <section class="sec" id="notes" aria-label="알아두세요">
-        <h2 class="sec-title">알아두세요</h2>
-        <ul class="notes">
-          <li><b>엑셀 시트</b>: 초안(통계테이블 형식) · 특약별요약 · 급부원문(원문과 근거) · 처리결과(파일별 성공/실패)</li>
-          <li>감액이 있으면 경과 구간을 나눕니다. 예) 0~12개월 : 50% / 13~999개월 : 100%</li>
-          <li>문서보안(DRM)이 걸린 파일과 <b>.doc</b> 파일은 읽을 수 없습니다. PDF나 .docx로 올려 주세요.</li>
-          <li>처음 열 때 준비에 1분 정도 걸립니다. 1,500쪽 PDF는 5분 안팎 걸립니다.</li>
-          <li>중단하면 처리 중이던 결과는 저장되지 않습니다.</li>
-        </ul>
-      </section>
+        <section class="sec" aria-label="양식 선택">
+          <h2 class="sec-title">양식 선택 · 실행</h2>
+          <div class="runbox">
+            <div class="band"><strong>양식 엑셀 선택</strong><span>원본 파일은 바뀌지 않고, 결과는 새 엑셀로 받습니다</span></div>
+            <div class="form">
+              <label class="k" for="r-pick-file">양식 엑셀</label>
+              <div class="field empty" id="r-src-field"><span id="r-src-text">시트 5개짜리 양식(.xlsx)을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns"><button type="button" id="r-pick-file">파일 선택</button></div>
+            </div>
+            <input class="hidden-input" type="file" id="r-in-file" accept=".xlsx,.xlsm">
+            <div class="bar">
+              <button type="button" class="primary" id="r-run" disabled>실행</button>
+              <button type="button" class="link" id="r-sample" disabled>예제 양식으로 해 보기</button>
+            </div>
+            <p class="notice" id="r-msg" hidden></p>
+            <div class="console" id="r-log" aria-live="polite" tabindex="0"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="r-result" aria-label="자동화 결과">
+          <h2 class="sec-title">결과 확인 <span class="tag" id="r-tag">예제 결과</span></h2>
+          <div class="result" id="r-view"></div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li><b>처리 방식</b>: 변경후 코드의 변경전 코드를 찾아, 기존 테이블의 그 코드 행을 그대로 복사하고 주보종·개별상품코드만 새 코드로 바꿉니다. 급부코드·산출기준·지급율·면책·경과년은 기존 값 그대로입니다.</li>
+            <li><b>상태</b>: 완료 · 확인필요(변경전 코드가 여러 개 등) · 기존 행 없음 · 신규 · 관계테이블에 없음. <b>기존 행 없음</b>과 <b>신규</b>는 약관을 보고 직접 작성하세요. [약관에서 추출] 탭을 쓰면 됩니다.</li>
+            <li>시트는 이름이 아니라 <b>순서</b>로 찾습니다. 칼럼명(MAIN_PROD_CODE 등)은 위에서 10행 안에 있어야 합니다.</li>
+            <li>결과 엑셀에서 그림·차트·매크로는 빠질 수 있습니다. 표 데이터는 그대로입니다.</li>
+          </ul>
+        </section>
+      </div>
     </main>
   </div>
 </div>
 
-<script type="application/json" id="sample-result">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 2개, 급부 8개", "급부 8개 → 초안 9행 (확인필요 3행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "납입주기", "산출기준", "지급율", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 0, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", null, "01", 0.2, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", null, "01", 0.02, 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", null, "01", 0.01, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, null, "01", 1, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, null, "01", 0.1, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, null, "01", 0.03, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, null, "01", 1, null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"]]}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"]]}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "납입주기", "산출기준", "기본지급율", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", null, null, null, null, "01", 0.5, null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", null, null, null, null, "01", 0.2, null, null, null, null, null, 0, 1, null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", null, null, null, null, "01", 0.02, null, null, null, null, null, 90, 0, null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", null, null, null, null, "01", 0.01, null, null, null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, null, null, null, null, "01", 0.1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, null, null, null, null, "01", 0.03, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"]]}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 8, "sample_policy.docx"]]}], "name": "통계테이블초안_예제.xlsx"}</script>
+<script type="application/json" id="sample-extract">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 2개, 급부 8개", "급부 8개 → 초안 9행 (확인필요 3행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "납입주기", "산출기준", "지급율", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 0, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", null, "01", 0.2, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", null, "01", 0.02, 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", null, "01", 0.01, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, null, "01", 1, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, null, "01", 0.1, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, null, "01", 0.03, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, null, "01", 1, null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"]], "colors": ["#FFF2CC", "#FFF2CC", null, null, null, null, null, null, "#FFF2CC"], "total": 9}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"]], "colors": [null, null], "total": 2}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "납입주기", "산출기준", "기본지급율", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", null, null, null, null, "01", 0.5, null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", null, null, null, null, "01", 0.2, null, null, null, null, null, 0, 1, null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", null, null, null, null, "01", 0.02, null, null, null, null, null, 90, 0, null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", null, null, null, null, "01", 0.01, null, null, null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, null, null, null, null, "01", 0.1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, null, null, null, null, "01", 0.03, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 8, "sample_policy.docx"]], "colors": [null], "total": 1}], "name": "통계테이블초안_예제.xlsx"}</script>
+<script type="application/json" id="sample-revise">{"log": ["기존 테이블 9행 / 관계 5건 / 변경전후 6건", "  완료: 2건", "  확인필요: 1건", "  기존 행 없음: 1건", "  신규(기존 행 없음): 1건", "  관계테이블에 없음: 1건", "작성 행 수: 8", "결과 파일: 통계테이블_자동작성_예제.xlsx"], "sheets": [{"name": "통계테이블 작성대상", "columns": ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1", "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"], "rows": [["A200", "A2001", "B0101", "01", 0.5, 0, 1, 90, 0, 12], ["A200", "A2001", "B0101", "01", 1, 0, 1, 0, 13, 999], ["A200", "A2001", "B0102", "01", 0.2, 0, 1, 0, 0, 999], ["A200", "A2001", "B0201", "01", 0.02, 1, 0, 90, 0, 999], ["A200", "A2002", "B0301", "01", 1, 0, 1, 0, 0, 999], ["A200", "A2002", "B0302", "01", 0.1, 1, 0, 0, 0, 999], ["A200", "A2003", "B0401", "02", 1, 0, 1, 0, 0, 999], ["A200", "A2003", "B0402", "03", 1, 0, 1, 0, 0, 999]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "검토_상품코드", "columns": ["주보종코드", "개별상품코드(변경후)", "변경전코드", "처리", "상태", "작성행수", "급부코드", "급부명", "비고", "상품명"], "rows": [["A200", "A2001", "A1001", "코드변경", "완료", 4, "B0101, B0102, B0201", "암진단비, 유사암진단비, 암입원비", null, "(무)예제암진단특약Ⅱ"], ["A200", "A2002", "A1002", "코드변경", "완료", 2, "B0301, B0302", "상해사망, 상해수술비", null, "(무)예제상해보장특약Ⅱ"], ["A200", "A2003", "A1003, A1005", "코드변경", "확인필요", 2, "B0401, B0402", "납입면제, 보험료환급", "변경전 코드가 2개 (A1003, A1005) → 행을 합침", "(무)예제납입면제특약Ⅱ"], ["A200", "A2006", "A1007", "코드변경", "기존 행 없음", 0, null, null, "기존 테이블에 A1007 행 없음", "(무)예제수술특약Ⅱ"], ["A200", "A2008", null, "신규", "신규(기존 행 없음)", 0, null, null, null, "(무)예제간병특약(신규)"], [null, "A2009", "A1009", "-", "관계테이블에 없음", 0, null, null, "변경후 코드가 주보종-개별상품 관계 테이블에 없어 주보종코드를 알 수 없음", null]], "colors": [null, null, "#FFF2CC", "#F8CBAD", "#DDEBF7", "#F8CBAD"], "total": 6}, {"name": "검토_요약", "columns": ["상태", "건수", "설명"], "rows": [["완료", 2, "기존 행을 그대로 이어받음"], ["확인필요", 1, "이어받았지만 비고 확인 필요 (변경전 코드 여러 개 등)"], ["기존 행 없음", 1, "변경전 코드는 있는데 기존 테이블에 행이 없음 → 약관 보고 직접 작성"], ["신규(기존 행 없음)", 1, "변경전 코드도, 기존 행도 없음 → 신규 상품, 약관 보고 직접 작성"], ["관계테이블에 없음", 1, "변경후 코드의 주보종코드를 알 수 없음 → 관계 테이블 확인"], ["작성된 행 수", 8, "'통계테이블 작성대상' 시트"]], "colors": [null, null, null, null, null, null], "total": 6}], "name": "통계테이블_자동작성_예제.xlsx"}</script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
   const WORD_EXT = /\.(docx|docm|doc|pdf)$/i;
-  const LONG_COLS = new Set(["확인필요", "급부목록", "근거_기준금액", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액", "경로", "결과", "별표명"]);
+  const XLSX_EXT = /\.(xlsx|xlsm)$/i;
+  const LONG_COLS = new Set(["확인필요", "급부목록", "근거_기준금액", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유",
+    "원문_지급금액", "경로", "결과", "별표명", "비고", "설명", "급부명", "급부코드", "상품명"]);
+  const NAMES = { extract: "약관에서 추출", revise: "개정 후 자동화" };
 
-  let src = [];            // [{path, file}]
-  let srcLabel = "";
-  let code = null;         // File
+  // 기능별 설정
+  const TOOLS = {
+    extract: {
+      p: "x",
+      legend: [["#FFF2CC", "확인필요 (엑셀에서도 노란색)"]],
+      sampleFile: "sample/sample_policy.docx",
+      sampleNote: "↑ 예제 약관을 실행한 기록입니다. 약관 파일을 고른 뒤 [실행]을 누르세요.",
+      doneMsg: "통계테이블 초안을 만들었습니다. 아래 결과를 확인하고 엑셀로 내려받으세요.",
+      stats(sheets) {
+        const by = (n) => sheets.find((s) => s.name === n);
+        const draft = by("초안"), raw = by("급부원문"), st = by("처리결과");
+        const ok = st ? st.rows.filter((r) => r[st.columns.indexOf("결과")] === "성공").length : 0;
+        return [
+          ["파일", st ? `${ok}/${st.total}` : "0", "성공"],
+          ["급부", raw ? raw.total : 0, "개"],
+          ["초안", draft ? draft.total : 0, "행"],
+          ["확인필요", draft ? draft.colors.filter(Boolean).length : 0, "행", true],
+        ];
+      },
+    },
+    revise: {
+      p: "r",
+      legend: [["#FFF2CC", "확인필요"], ["#F8CBAD", "기존 행 없음 · 관계테이블에 없음"], ["#DDEBF7", "신규"]],
+      sampleFile: "sample/sample_revision.xlsx",
+      sampleNote: "↑ 예제 양식을 실행한 기록입니다. 양식 엑셀을 고른 뒤 [실행]을 누르세요.",
+      doneMsg: "개정 후 통계테이블을 채웠습니다. 색 표시된 상품을 확인하고 엑셀로 내려받으세요.",
+      stats(sheets) {
+        const sum = sheets.find((s) => s.name === "검토_요약");
+        const get = (k) => {
+          const r = sum && sum.rows.find((x) => x[0] === k);
+          return r ? r[1] : 0;
+        };
+        return [
+          ["작성", get("작성된 행 수"), "행"],
+          ["완료", get("완료"), "건"],
+          ["확인필요", get("확인필요"), "건", true],
+          ["기존 행 없음", get("기존 행 없음"), "건", true],
+          ["신규", get("신규(기존 행 없음)"), "건", true],
+          ["관계테이블에 없음", get("관계테이블에 없음"), "건", true],
+        ];
+      },
+    },
+  };
+  for (const [k, t] of Object.entries(TOOLS)) Object.assign(t, { key: k, files: [], code: null, result: null, sheet: 0, onlyMarked: false });
+
   let worker = null;
   let engineReady = false;
-  let running = false;
-  let result = null;       // {name, sheets, xlsx(Blob)|null, sample}
-  let activeSheet = 0;
+  let busy = null;          // 실행 중인 기능 ("extract" | "revise" | null)
+  let current = "extract";
 
-  // ---------- 상태 표시 ----------
+  // ---------- 화면 공통 ----------
   function setEngine(state, text) {
     $("engine").dataset.state = state;
     $("engine-text").textContent = text;
   }
-  function showMsg(text, kind) {
-    const m = $("msg");
+  function showMsg(t, text, kind) {
+    const m = $(t.p + "-msg");
     if (!text) { m.hidden = true; return; }
     m.textContent = text;
     m.className = "notice" + (kind ? " " + kind : "");
     m.hidden = false;
   }
-  function logLine(text, cls) {
-    const box = $("log");
+  function logLine(t, text, cls) {
+    const box = $(t.p + "-log");
     const line = document.createElement("div");
     if (cls) line.className = cls;
     line.textContent = text;
@@ -335,13 +435,47 @@ html { scroll-behavior: smooth; }
     box.scrollTop = box.scrollHeight;
   }
   function refreshButtons() {
-    $("run").disabled = !engineReady || running || !src.length;
-    $("run-sample").disabled = !engineReady || running;
-    $("stop").disabled = !running;
-    for (const id of ["pick-dir", "pick-file", "pick-code", "clear-code"]) $(id).disabled = running;
+    for (const t of Object.values(TOOLS)) {
+      $(t.p + "-run").disabled = !engineReady || !!busy || !t.files.length;
+      $(t.p + "-sample").disabled = !engineReady || !!busy;
+      $(t.p + "-pick-file").disabled = busy === t.key;
+    }
+    $("x-stop").disabled = busy !== "extract";
+    for (const id of ["x-pick-dir", "x-pick-code", "x-clear-code"]) $(id).disabled = busy === "extract";
   }
 
-  // ---------- Python 작업자 ----------
+  // ---------- 기능 탭 ----------
+  function selectTool(key, focus) {
+    if (!TOOLS[key]) key = "extract";
+    current = key;
+    for (const k of Object.keys(TOOLS)) {
+      const on = k === key;
+      $("tab-" + k).setAttribute("aria-selected", String(on));
+      $("tab-" + k).tabIndex = on ? 0 : -1;
+      $("panel-" + k).hidden = !on;
+    }
+    document.querySelectorAll("[data-tool-link]").forEach((a) => a.classList.toggle("cur", a.dataset.toolLink === key));
+    $("crumb-tool").textContent = NAMES[key];
+    if (focus) $("tab-" + key).focus();
+  }
+  document.querySelectorAll(".tooltab").forEach((b) => {
+    b.addEventListener("click", () => { selectTool(b.dataset.tool); history.replaceState(null, "", "#" + b.dataset.tool); });
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const next = current === "extract" ? "revise" : "extract";
+      selectTool(next, true);
+      history.replaceState(null, "", "#" + next);
+    });
+  });
+  document.querySelectorAll("[data-tool-link]").forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    selectTool(a.dataset.toolLink);
+    history.replaceState(null, "", "#" + a.dataset.toolLink);
+    $("tab-" + a.dataset.toolLink).scrollIntoView({ block: "nearest" });
+  }));
+  window.addEventListener("hashchange", () => selectTool(location.hash.slice(1)));
+
+  // ---------- 실행 엔진 (브라우저 안 Python) ----------
   function startWorker() {
     engineReady = false;
     setEngine("loading", "준비 중");
@@ -353,109 +487,113 @@ html { scroll-behavior: smooth; }
       else if (d.type === "ready") { engineReady = true; setEngine("ready", "준비됨"); refreshButtons(); }
       else if (d.type === "fatal") {
         setEngine("fail", "준비 실패");
-        showMsg("프로그램을 준비하지 못했습니다 (" + d.message + "). 인터넷 연결을 확인하고 새로고침해 주세요.", "err");
+        for (const t of Object.values(TOOLS)) showMsg(t, "프로그램을 준비하지 못했습니다 (" + d.message + "). 인터넷 연결을 확인하고 새로고침해 주세요.", "err");
       }
-      else if (d.type === "log") logLine(d.m);
-      else if (d.type === "done") finishRun(d);
-      else if (d.type === "error") failRun(d.message);
+      else if (d.type === "log" && busy) logLine(TOOLS[busy], d.m);
+      else if (d.type === "done") finishRun(TOOLS[d.tool], d);
+      else if (d.type === "error") failRun(TOOLS[d.tool], d.message);
     };
     worker.onerror = (e) => {
       setEngine("fail", "준비 실패");
-      showMsg("프로그램을 준비하지 못했습니다" + (e.message ? " (" + e.message + ")" : "") + ". 새로고침해 주세요.", "err");
+      for (const t of Object.values(TOOLS)) showMsg(t, "프로그램을 준비하지 못했습니다" + (e.message ? " (" + e.message + ")" : "") + ". 새로고침해 주세요.", "err");
       e.preventDefault();
     };
   }
 
-  async function run(files, codeFile) {
-    if (!engineReady || running) return;
-    showMsg("");
-    running = true;
-    setEngine("busy", "추출 중");
+  async function run(t, files, code) {
+    if (!engineReady || busy) return;
+    showMsg(t, "");
+    busy = t.key;
+    setEngine("busy", "실행 중");
     refreshButtons();
-    $("log").textContent = "";
-    logLine("추출 시작...");
+    $(t.p + "-log").textContent = "";
+    logLine(t, t.key === "extract" ? "추출 시작..." : "작성 시작...");
     try {
       const payload = await Promise.all(files.map(async (f) => ({ path: f.path, data: await f.file.arrayBuffer() })));
-      const codePayload = codeFile ? { name: codeFile.name, data: await codeFile.arrayBuffer() } : null;
-      worker.postMessage({ type: "run", files: payload, code: codePayload }, payload.map((p) => p.data).concat(codePayload ? [codePayload.data] : []));
+      const codePayload = code ? { name: code.name, data: await code.arrayBuffer() } : null;
+      const transfer = payload.map((p) => p.data).concat(codePayload ? [codePayload.data] : []);
+      worker.postMessage({ type: "run", tool: t.key, files: payload, code: codePayload }, transfer);
     } catch (e) {
-      failRun("파일을 읽지 못했습니다: " + e.message);
+      failRun(t, "파일을 읽지 못했습니다: " + e.message);
     }
   }
-
-  function finishRun(d) {
-    running = false;
+  function finishRun(t, d) {
+    busy = null;
     setEngine("ready", "준비됨");
     refreshButtons();
-    const sheets = JSON.parse(d.sheets);
-    setResult({ name: d.name, sheets, xlsx: new Blob([d.xlsx]), sample: false });
-    showMsg("통계테이블 초안을 만들었습니다. 아래 결과를 확인하고 엑셀로 내려받으세요.");
-    document.querySelector("[aria-label='결과']").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    setResult(t, { name: d.name, sheets: JSON.parse(d.sheets), xlsx: new Blob([d.xlsx]), sample: false });
+    showMsg(t, t.doneMsg);
+    $(t.p + "-result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
-  function failRun(message) {
-    running = false;
+  function failRun(t, message) {
+    busy = null;
     setEngine("ready", "준비됨");
     refreshButtons();
-    logLine("오류: " + message, "err");
-    showMsg(message, "err");
+    logLine(t, "오류: " + message, "err");
+    showMsg(t, message, "err");
   }
 
-  $("stop").addEventListener("click", () => {
-    if (!running) return;
+  $("x-stop").addEventListener("click", () => {
+    if (busy !== "extract") return;
     worker.terminate();
-    running = false;
-    logLine("중단했습니다. 처리 중이던 결과는 저장되지 않습니다.", "dim");
-    showMsg("중단했습니다. 다시 실행할 수 있게 준비하는 중입니다.", "warn");
+    busy = null;
+    logLine(TOOLS.extract, "중단했습니다. 처리 중이던 결과는 저장되지 않습니다.", "dim");
+    showMsg(TOOLS.extract, "중단했습니다. 다시 실행할 수 있게 준비하는 중입니다.", "warn");
     startWorker();
   });
 
   // ---------- 파일 고르기 ----------
-  function setSource(list, label) {
-    const usable = list.filter((f) => WORD_EXT.test(f.path) && !f.path.split("/").pop().startsWith("~$"));
-    src = usable;
-    srcLabel = label;
-    const field = $("src-field");
+  function setSource(t, list, label) {
+    const ok = t.key === "extract" ? WORD_EXT : XLSX_EXT;
+    let usable = list.filter((f) => ok.test(f.path) && !f.path.split("/").pop().startsWith("~$"));
+    if (t.key === "revise") usable = usable.slice(0, 1);
     if (!list.length) return;
-    field.classList.remove("empty");
+    t.files = usable;
+    $(t.p + "-src-field").classList.remove("empty");
     if (!usable.length) {
-      $("src-text").textContent = label + " (Word/PDF 파일 없음)";
-      showMsg("고른 곳에서 Word/PDF 파일을 찾지 못했습니다.", "warn");
+      $(t.p + "-src-text").textContent = label + (t.key === "extract" ? " (PDF·Word 파일 없음)" : " (엑셀 파일 아님)");
+      showMsg(t, t.key === "extract" ? "고른 곳에서 PDF·Word 약관을 찾지 못했습니다." : "양식은 엑셀(.xlsx) 파일이어야 합니다.", "warn");
     } else {
-      $("src-text").textContent = usable.length === 1 ? usable[0].path : `${label} · Word/PDF ${usable.length}개`;
-      showMsg("");
+      $(t.p + "-src-text").textContent = usable.length === 1 ? usable[0].path : `${label} · PDF·Word ${usable.length}개`;
+      showMsg(t, "");
     }
     refreshButtons();
   }
-  $("pick-dir").addEventListener("click", () => $("in-dir").click());
-  $("pick-file").addEventListener("click", () => $("in-file").click());
-  $("pick-code").addEventListener("click", () => $("in-code").click());
-  $("in-dir").addEventListener("change", (e) => {
+  const pick = (btn, input) => $(btn).addEventListener("click", () => $(input).click());
+  pick("x-pick-file", "x-in-file");
+  pick("x-pick-dir", "x-in-dir");
+  pick("x-pick-code", "x-in-code");
+  pick("r-pick-file", "r-in-file");
+  $("x-in-dir").addEventListener("change", (e) => {
     const files = [...e.target.files];
-    if (!files.length) return;
-    const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
-    setSource(files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
+    if (files.length) {
+      const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+      setSource(TOOLS.extract, files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
+    }
     e.target.value = "";
   });
-  $("in-file").addEventListener("change", (e) => {
-    const files = [...e.target.files];
-    if (!files.length) return;
-    setSource(files.map((f) => ({ path: f.name, file: f })), files.length === 1 ? files[0].name : "선택한 파일");
-    e.target.value = "";
-  });
-  $("in-code").addEventListener("change", (e) => {
+  for (const [input, t] of [["x-in-file", TOOLS.extract], ["r-in-file", TOOLS.revise]]) {
+    $(input).addEventListener("change", (e) => {
+      const files = [...e.target.files];
+      if (files.length) setSource(t, files.map((f) => ({ path: f.name, file: f })), files.length === 1 ? files[0].name : "선택한 파일");
+      e.target.value = "";
+    });
+  }
+  $("x-in-code").addEventListener("change", (e) => {
     const f = e.target.files[0];
-    if (!f) return;
-    code = f;
-    $("code-field").classList.remove("empty");
-    $("code-text").textContent = f.name;
-    $("clear-code").hidden = false;
+    if (f) {
+      TOOLS.extract.code = f;
+      $("x-code-field").classList.remove("empty");
+      $("x-code-text").textContent = f.name;
+      $("x-clear-code").hidden = false;
+    }
     e.target.value = "";
   });
-  $("clear-code").addEventListener("click", () => {
-    code = null;
-    $("code-field").classList.add("empty");
-    $("code-text").textContent = "첫 열 = 급부코드, 둘째 열 = 급부코드명 (.xlsx)";
-    $("clear-code").hidden = true;
+  $("x-clear-code").addEventListener("click", () => {
+    TOOLS.extract.code = null;
+    $("x-code-field").classList.add("empty");
+    $("x-code-text").textContent = "엑셀(.xlsx) · 첫 열 급부코드, 둘째 열 급부코드명";
+    $("x-clear-code").hidden = true;
   });
 
   // 끌어다 놓기 (폴더도 가능)
@@ -472,204 +610,216 @@ html { scroll-behavior: smooth; }
       } while (batch.length);
     }
   }
-  const zone = $("src-field");
-  ["dragenter", "dragover"].forEach((t) => zone.addEventListener(t, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((t) => zone.addEventListener(t, () => zone.classList.remove("drag")));
-  zone.addEventListener("drop", async (e) => {
-    e.preventDefault();
-    if (running) return;
-    const items = [...(e.dataTransfer.items || [])].map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
-    const out = [];
-    if (items.length) for (const it of items) await readEntry(it, "", out);
-    else for (const f of e.dataTransfer.files) out.push({ path: f.name, file: f });
-    const dirs = items.filter((i) => i.isDirectory);
-    setSource(out, dirs.length === 1 && items.length === 1 ? dirs[0].name + "/" : out.length === 1 ? out[0].path : "끌어다 놓은 파일");
-  });
+  for (const t of Object.values(TOOLS)) {
+    const zone = $(t.p + "-src-field");
+    ["dragenter", "dragover"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove("drag")));
+    zone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      if (busy === t.key) return;
+      const items = [...(e.dataTransfer.items || [])].map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+      const out = [];
+      if (items.length) for (const it of items) await readEntry(it, "", out);
+      else for (const f of e.dataTransfer.files) out.push({ path: f.name, file: f });
+      const dirs = items.filter((i) => i.isDirectory);
+      setSource(t, out, dirs.length === 1 && items.length === 1 ? dirs[0].name + "/" : out.length === 1 ? out[0].path : "끌어다 놓은 파일");
+    });
+  }
 
-  $("run").addEventListener("click", () => {
-    if (!src.length) { showMsg("약관 폴더 또는 파일을 선택해 주세요.", "warn"); return; }
-    run(src, code);
-  });
-  $("run-sample").addEventListener("click", async () => {
-    try {
-      let blob;
-      const r = await fetch("sample/sample_policy.docx").catch(() => null);
-      if (r && r.ok) blob = await r.blob();
-      else {
-        // .docx 를 내보내지 않는 곳에서는 base64 글자 파일로 올려 둠
-        const t = await fetch("sample/sample_policy.docx.txt");
-        if (!t.ok) throw new Error(t.status);
-        blob = new Blob([Uint8Array.from(atob((await t.text()).trim()), (c) => c.charCodeAt(0))]);
+  // 예제 파일 (.docx/.xlsx 를 내보내지 않는 곳에서는 base64 글자 파일로 올려 둠)
+  async function sampleBlob(path) {
+    const r = await fetch(path).catch(() => null);
+    if (r && r.ok) return r.blob();
+    const t = await fetch(path + ".txt");
+    if (!t.ok) throw new Error(t.status);
+    return new Blob([Uint8Array.from(atob((await t.text()).trim()), (c) => c.charCodeAt(0))]);
+  }
+  for (const t of Object.values(TOOLS)) {
+    $(t.p + "-run").addEventListener("click", () => {
+      if (!t.files.length) { showMsg(t, t.key === "extract" ? "약관 파일을 선택해 주세요." : "양식 엑셀을 선택해 주세요.", "warn"); return; }
+      run(t, t.files, t.key === "extract" ? t.code : null);
+    });
+    $(t.p + "-sample").addEventListener("click", async () => {
+      try {
+        const name = t.sampleFile.split("/").pop();
+        const file = new File([await sampleBlob(t.sampleFile)], name);
+        run(t, [{ path: name, file }], null);
+      } catch (e) {
+        showMsg(t, "예제 파일을 불러오지 못했습니다.", "err");
       }
-      const file = new File([blob], "sample_policy.docx");
-      run([{ path: "sample_policy.docx", file }], null);
+    });
+  }
+  $("r-template").addEventListener("click", async () => {
+    try {
+      await saveFile(TOOLS.revise, await sampleBlob(TOOLS.revise.sampleFile), "통계테이블_자동작성_예제양식.xlsx");
     } catch (e) {
-      showMsg("예제 약관 파일을 불러오지 못했습니다.", "err");
+      showMsg(TOOLS.revise, "예제 양식을 불러오지 못했습니다.", "err");
     }
   });
 
-  // ---------- 결과 표 ----------
-  const sheetByName = (n) => result && result.sheets.find((s) => s.name === n);
-  function needCheck(sheet, row) {
-    const i = sheet.columns.indexOf("확인필요");
-    return i >= 0 && row[i] !== null && row[i] !== "" && sheet.name === "초안";
-  }
-  function fmt(v) {
-    if (v === null || v === undefined) return "";
-    return String(v);
-  }
-  function renderStats() {
-    const draft = sheetByName("초안");
-    const raw = sheetByName("급부원문");
-    const stat = sheetByName("처리결과");
-    const nChk = draft ? draft.rows.filter((r) => needCheck(draft, r)).length : 0;
-    const ok = stat ? stat.rows.filter((r) => r[stat.columns.indexOf("결과")] === "성공").length : 0;
-    const items = [
-      ["파일", stat ? `${ok}/${stat.rows.length}` : "0", "성공"],
-      ["급부", raw ? raw.rows.length : 0, "개"],
-      ["초안", draft ? draft.rows.length : 0, "행"],
-    ];
-    const box = $("stats");
-    box.textContent = "";
-    for (const [k, v, unit] of items) {
+  // ---------- 결과 보기 ----------
+  function fmt(v) { return v === null || v === undefined ? "" : String(v); }
+  function buildView(t) {
+    const v = $(t.p + "-view");
+    v.innerHTML = `
+      <div class="result-bar">
+        <div style="min-width:0"><div class="fname"></div><div class="stats"></div></div>
+        <button type="button" class="primary dl">엑셀 내려받기</button>
+      </div>
+      <div class="sheet">
+        <div class="tabs" role="tablist"></div>
+        <div class="sheet-tools">
+          <span class="legend"></span>
+          <label><input type="checkbox" class="only"> 색 표시된 행만 보기</label>
+        </div>
+        <div class="grid-wrap" role="tabpanel"></div>
+        <div class="more" hidden></div>
+      </div>`;
+    const legend = v.querySelector(".legend");
+    for (const [color, label] of t.legend) {
       const s = document.createElement("span");
-      s.innerHTML = `${k} <b></b>${unit}`;
-      s.querySelector("b").textContent = v;
-      box.appendChild(s);
+      s.innerHTML = "<i></i>";
+      s.firstChild.style.background = color;
+      s.append(label);
+      legend.appendChild(s);
     }
-    const c = document.createElement("span");
-    c.className = "chk";
-    c.innerHTML = "확인필요 <b></b>행";
-    c.querySelector("b").textContent = nChk;
-    box.appendChild(c);
+    v.querySelector(".only").addEventListener("change", (e) => { t.onlyMarked = e.target.checked; renderGrid(t); });
+    v.querySelector(".dl").addEventListener("click", () => {
+      if (t.result && t.result.xlsx) saveFile(t, t.result.xlsx, t.result.name);
+    });
   }
-  function renderTabs() {
-    const tabs = $("tabs");
+  function setResult(t, r) {
+    t.result = r;
+    t.sheet = 0;
+    const v = $(t.p + "-view");
+    $(t.p + "-tag").hidden = !r.sample;
+    v.querySelector(".fname").textContent = r.name;
+    const dl = v.querySelector(".dl");
+    dl.disabled = !r.xlsx;
+    dl.title = r.xlsx ? "" : "예제 결과는 미리보기만 됩니다. [예제로 해 보기]를 누르면 엑셀을 내려받을 수 있습니다.";
+    const stats = v.querySelector(".stats");
+    stats.textContent = "";
+    for (const [k, val, unit, warn] of t.stats(r.sheets)) {
+      const s = document.createElement("span");
+      if (warn && Number(val) > 0) s.className = "chk";
+      s.append(k + " ");
+      const b = document.createElement("b");
+      b.textContent = val;
+      s.append(b, unit);
+      stats.appendChild(s);
+    }
+    renderTabs(t);
+    renderGrid(t);
+  }
+  function renderTabs(t) {
+    const tabs = $(t.p + "-view").querySelector(".tabs");
     tabs.textContent = "";
-    result.sheets.forEach((s, i) => {
+    t.result.sheets.forEach((s, i) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "tab";
       b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", String(i === activeSheet));
-      b.innerHTML = `<span></span><span class="n"></span>`;
-      b.firstChild.textContent = s.name;
-      b.lastChild.textContent = s.rows.length;
-      b.addEventListener("click", () => { activeSheet = i; renderTabs(); renderGrid(); });
+      b.setAttribute("aria-selected", String(i === t.sheet));
+      const name = document.createElement("span");
+      name.textContent = s.name;
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = s.total;
+      b.append(name, n);
+      b.addEventListener("click", () => { t.sheet = i; renderTabs(t); renderGrid(t); });
       tabs.appendChild(b);
     });
   }
-  function renderGrid() {
-    const sheet = result.sheets[activeSheet];
-    const isDraft = sheet.name === "초안";
-    $("sheet-tools").hidden = !isDraft;
-    const only = isDraft && $("only-check").checked;
-    const grid = $("grid");
+  function renderGrid(t) {
+    const v = $(t.p + "-view");
+    const sheet = t.result.sheets[t.sheet];
+    const hasColor = sheet.colors.some(Boolean);
+    v.querySelector(".sheet-tools").hidden = !hasColor;
+    const only = hasColor && t.onlyMarked;
+    const grid = v.querySelector(".grid-wrap");
     grid.textContent = "";
-    const rows = sheet.rows.map((r, i) => [r, i]).filter(([r]) => !only || needCheck(sheet, r));
+    const rows = sheet.rows.map((r, i) => [r, i]).filter(([, i]) => !only || sheet.colors[i]);
+    const more = v.querySelector(".more");
+    more.hidden = sheet.total <= sheet.rows.length;
+    more.textContent = `미리보기는 앞 ${sheet.rows.length.toLocaleString()}행만 보여 줍니다. 엑셀에는 ${sheet.total.toLocaleString()}행 모두 들어 있습니다.`;
     if (!rows.length) {
       const p = document.createElement("div");
       p.className = "empty-sheet";
-      p.textContent = sheet.rows.length ? "확인필요 행이 없습니다." : "이 시트에 행이 없습니다.";
+      p.textContent = sheet.rows.length ? "색 표시된 행이 없습니다." : "이 시트에 행이 없습니다.";
       grid.appendChild(p);
       return;
     }
     const table = document.createElement("table");
-    const thead = table.createTHead().insertRow();
+    const head = table.createTHead().insertRow();
     const th0 = document.createElement("th");
     th0.className = "rowno";
-    thead.appendChild(th0);
+    head.appendChild(th0);
     for (const c of sheet.columns) {
       const th = document.createElement("th");
       th.textContent = c;
-      thead.appendChild(th);
+      head.appendChild(th);
     }
     const tb = table.createTBody();
     for (const [r, i] of rows) {
       const tr = tb.insertRow();
-      if (needCheck(sheet, r)) tr.className = "need";
+      const color = sheet.colors[i];
+      if (color) tr.className = "marked";
       const n = tr.insertCell();
       n.className = "rowno";
-      n.textContent = i + 2;          // 엑셀 행 번호 (1행은 머리글)
-      r.forEach((v, j) => {
+      n.textContent = i + 1;
+      r.forEach((val, j) => {
         const td = tr.insertCell();
-        td.textContent = fmt(v);
-        if (typeof v === "number") td.className = "num";
-        else if (LONG_COLS.has(sheet.columns[j]) && String(v || "").length > 24) td.className = "long";
+        td.textContent = fmt(val);
+        if (color) td.style.background = color;
+        if (typeof val === "number") td.className = "num";
+        else if (LONG_COLS.has(sheet.columns[j]) && String(val || "").length > 24) td.className = "long";
       });
     }
     grid.appendChild(table);
   }
-  $("only-check").addEventListener("change", renderGrid);
-
-  function setResult(r) {
-    result = r;
-    activeSheet = 0;
-    $("result-tag").hidden = !r.sample;
-    $("result-name").textContent = r.name;
-    $("download").disabled = !r.xlsx;
-    $("download").title = r.xlsx ? "" : "예제 결과는 미리보기만 됩니다. 예제 약관으로 실행하면 엑셀을 내려받을 수 있습니다.";
-    renderStats();
-    renderTabs();
-    renderGrid();
-  }
 
   // ---------- 내려받기 ----------
-  $("download").addEventListener("click", async () => {
-    if (!result || !result.xlsx) return;
-    const filename = result.name;
-    const claudeUse = window.claude && window.claude.use;
-    if (claudeUse) {
+  async function saveFile(t, blob, filename) {
+    if (window.claude && window.claude.use) {
       const dl = await window.claude.use("downloads").catch(() => null);
       if (dl) {
         try {
-          await dl.save({ filename, data: result.xlsx });
-          showMsg("엑셀을 저장했습니다: " + filename);
+          await dl.save({ filename, data: blob });
+          showMsg(t, "엑셀을 저장했습니다: " + filename);
         } catch (e) {
-          if (e && e.code === "declined") showMsg("저장을 취소했습니다.", "warn");
-          else showMsg("이 화면에서는 파일을 저장할 수 없습니다 (" + (e && e.code || "unavailable") + ").", "err");
+          if (e && e.code === "declined") showMsg(t, "저장을 취소했습니다.", "warn");
+          else showMsg(t, "이 화면에서는 파일을 저장할 수 없습니다 (" + ((e && e.code) || "unavailable") + ").", "err");
         }
         return;
       }
     }
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(result.xlsx);
+    a.href = URL.createObjectURL(blob);
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  });
+  }
 
-  // ---------- 시작: 예제 결과를 먼저 보여 주고 Python을 미리 불러 둠 ----------
-  try {
-    const sample = JSON.parse($("sample-result").textContent);
-    for (const l of sample.log) logLine(l, "dim");
-    logLine("↑ 예제 약관을 실행한 기록입니다. 약관 파일을 고른 뒤 [실행]을 누르세요.", "dim");
-    setResult({ name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
-  } catch (e) {}
+  // ---------- 시작: 예제 결과를 먼저 보여 주고 실행 엔진을 미리 준비 ----------
+  for (const t of Object.values(TOOLS)) {
+    buildView(t);
+    try {
+      const sample = JSON.parse($("sample-" + t.key).textContent);
+      for (const l of sample.log) logLine(t, l, "dim");
+      logLine(t, t.sampleNote, "dim");
+      setResult(t, { name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
+    } catch (e) {}
+  }
+  selectTool(location.hash.slice(1));
   refreshButtons();
   startWorker();
-})();
-</script>
-<script>
-(() => {
+
   // 회사 로고: web/logo.png 를 두면 왼쪽 위에 표시 (없으면 글자만)
   const img = new Image();
   img.alt = "";
-  img.onload = () => document.getElementById("logo-slot").appendChild(img);
+  img.onload = () => $("logo-slot").appendChild(img);
   img.src = "logo.png";
-
-  // 왼쪽 메뉴: 지금 보고 있는 구역 표시
-  const links = [...document.querySelectorAll(".lnb .sub a")];
-  const mark = (id) => links.forEach((a) => a.classList.toggle("cur", a.getAttribute("href") === "#" + id));
-  links.forEach((a) => a.addEventListener("click", () => mark(a.getAttribute("href").slice(1))));
-  if ("IntersectionObserver" in window) {
-    const io = new IntersectionObserver((es) => {
-      const vis = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (vis) mark(vis.target.id);
-    }, { rootMargin: "-20% 0px -60% 0px" });
-    ["guide", "run-section", "result", "notes"].forEach((id) => io.observe(document.getElementById(id)));
-  }
 })();
 </script>
