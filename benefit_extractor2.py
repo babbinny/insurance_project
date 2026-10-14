@@ -673,8 +673,15 @@ def get_basis(amount_text, unit_premium=None):
     return "확인", ""
 
 
+# 감액 문구: '1년미만 … 50%'  (get_reduction 과 get_rate 가 함께 씀)
+REDUCTION_RE = r"(\d+)\s*년\s*(?:미만|이내)([^%]{0,60}?)(\d+(?:\.\d+)?)\s*%"
+
+
 def get_rate(amount_text, base=None):
-    """지급금액 → (지급율, 확인필요메모)"""
+    """지급금액 → (지급율, 확인필요메모)
+    감액 문구의 %는 기본 지급율이 아니므로 빼고 봄
+      예) '보험가입금액 (다만, 1년미만 진단확정시 보험가입금액의 50% 지급)' → 1 (감액 50%는 경과 구간에서 따로 적용)"""
+    amount_text = re.sub(REDUCTION_RE, " ", amount_text)
     pcts = re.findall(r"(\d+(?:\.\d+)?)\s*%", amount_text)
     if len(pcts) == 1:
         return round(float(pcts[0]) / 100, 4), ""
@@ -697,7 +704,7 @@ def get_reduction(text):
     """감액 문구 → (년수, 비율, 방식, 원문)
     '1년미만 ... 치료비의 50%'       → 기본지급율 × 0.5 (비율)
     '1년미만 ... 보험가입금액의 50%' → 0.5 그대로 (절대값)"""
-    m = re.search(r"(\d+)\s*년\s*(?:미만|이내)([^%]{0,60}?)(\d+(?:\.\d+)?)\s*%", text)
+    m = re.search(REDUCTION_RE, text)
     if not m:
         return None, None, "", ""
     mode = "절대값" if "가입금액" in nospace(m.group(2)) else "비율"
