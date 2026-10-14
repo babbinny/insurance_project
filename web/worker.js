@@ -15,7 +15,7 @@ const CRYPTO_STUB = {
   "cryptography/hazmat/backends/__init__.py": "def default_backend():\n    return None\n",
   "cryptography/hazmat/primitives/__init__.py": "",
   "cryptography/hazmat/primitives/ciphers/__init__.py":
-    "def _no(*a, **k):\n    raise RuntimeError('AES로 암호화된 PDF는 웹에서 읽을 수 없습니다. Spyder에서 실행해 주세요.')\n" +
+    "def _no(*a, **k):\n    raise RuntimeError('AES로 암호화된 PDF는 이 화면에서 읽을 수 없습니다. 암호를 푼 PDF나 Word 파일로 올려 주세요.')\n" +
     "class _NS:\n    def __getattr__(self, name):\n        return _no\n" +
     "Cipher = _no\nalgorithms = _NS()\nmodes = _NS()\n",
 };
@@ -62,13 +62,13 @@ async function fetchText(...urls) {
 
 async function boot() {
   const bundle = await localBundle();
-  status("Python 불러오는 중");
+  status("1/3");
   let py;
   if (bundle) {
     importScripts(LOCAL + "pyodide.js");
     const stdlib = URL.createObjectURL(new Blob([await partsToBytes(bundle.stdlib)]));
     py = await loadPyodide({ indexURL: LOCAL, stdLibURL: stdlib });
-    status("pandas · openpyxl · pdfplumber 설치 중");
+    status("2/3");
     for (const w of bundle.wheels) py.unpackArchive(await partsToBytes(w), "wheel");
     for (const [path, src] of Object.entries(CRYPTO_STUB)) {
       py.FS.mkdirTree("/app/" + path.slice(0, path.lastIndexOf("/")));
@@ -77,7 +77,7 @@ async function boot() {
   } else {
     importScripts(CDN + "pyodide.js");
     py = await loadPyodide({ indexURL: CDN });
-    status("pandas · openpyxl · pdfplumber 설치 중");
+    status("2/3");
     await py.loadPackage(["pandas", "micropip", "cryptography", "charset-normalizer"]);
     const micropip = py.pyimport("micropip");
     await micropip.install(["openpyxl==3.1.5", "pdfminer.six==20231228"]);
@@ -85,7 +85,7 @@ async function boot() {
     await micropip.install.callKwargs("pdfplumber==0.11.4", { deps: false });
   }
 
-  status("추출 프로그램 불러오는 중");
+  status("3/3");
   py.FS.mkdirTree("/app");
   py.FS.writeFile("/app/benefit_extractor2.py", await fetchText("benefit_extractor2.py", "../benefit_extractor2.py"));
   py.FS.writeFile("/app/web_runner.py", await fetchText("web_runner.py"));
