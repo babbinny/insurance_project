@@ -1,7 +1,7 @@
 # insurance_project
 ## 웹페이지로 실행하기 (`web/`)
 
-Spyder에서 F5로 띄우던 창과 같은 화면을 웹페이지로 만든 것입니다. `benefit_extractor.py` 를 고치지 않고
+Spyder에서 F5로 띄우던 창과 같은 화면을 웹페이지로 만든 것입니다. `benefit_extractor2.py` 를 고치지 않고
 브라우저 안의 Python(Pyodide)으로 그대로 실행하므로, 약관 파일은 서버로 올라가지 않습니다.
 
 - `web/index.html` : 화면 (약관 폴더/파일 · 급부코드표 선택 → 실행/중단 → 로그 → 결과 시트 미리보기 → 엑셀 내려받기)

@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-웹페이지(web/index.html)에서 benefit_extractor.run() 을 부르는 연결 코드.
+웹페이지(web/index.html)에서 benefit_extractor2.run() 을 부르는 연결 코드.
 - 브라우저 안의 Python(Pyodide)에서 실행됩니다. 약관 파일은 서버로 올라가지 않습니다.
-- 추출 규칙은 benefit_extractor.py 그대로 사용하고, 결과 엑셀을 화면 미리보기용 JSON 으로도 돌려줍니다.
+- 추출 규칙은 benefit_extractor2.py 그대로 사용하고, 결과 엑셀을 화면 미리보기용 JSON 으로도 돌려줍니다.
 """
 import json
 import math
 
 import pandas as pd
 
-import benefit_extractor as be
+import benefit_extractor2 as be
 
 
 def _cell(v):

@@ -1,4 +1,4 @@
-// 브라우저 안에서 Python(Pyodide)을 띄워 benefit_extractor.py 를 그대로 실행하는 작업자.
+// 브라우저 안에서 Python(Pyodide)을 띄워 benefit_extractor2.py 를 그대로 실행하는 작업자.
 // 화면(index.html)과 메시지로 주고받습니다:
 //   화면 → {type:"run", files:[{path, data}], code:{name, data}|null}
 //   작업자 → {type:"status"|"log"|"done"|"error", ...}
@@ -87,7 +87,7 @@ async function boot() {
 
   status("추출 프로그램 불러오는 중");
   py.FS.mkdirTree("/app");
-  py.FS.writeFile("/app/benefit_extractor.py", await fetchText("benefit_extractor.py", "../benefit_extractor.py"));
+  py.FS.writeFile("/app/benefit_extractor2.py", await fetchText("benefit_extractor2.py", "../benefit_extractor2.py"));
   py.FS.writeFile("/app/web_runner.py", await fetchText("web_runner.py"));
   py.runPython("import sys, importlib; sys.path.insert(0, '/app'); importlib.invalidate_caches(); import web_runner");
   return py;
