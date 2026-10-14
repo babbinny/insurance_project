@@ -1,0 +1,573 @@
+<meta charset="utf-8">
+<title>약관 지급기준표 추출</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: Spyder에서 뜨는 Tk 창(입력 3줄 · 실행/중단 · 로그)을 그대로 위에 두고, 그 아래에 결과 엑셀 4개 시트를 탭으로 펼친다 */
+:root {
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --sunken: #f6f8f9;
+  --ink: #16212a;
+  --muted: #5a6874;
+  --line: #d5dde2;
+  --accent: #1c5a72;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2eef3;
+  --check: #fff2cc;          /* 엑셀 '확인필요' 행 색 (benefit_extractor.py 의 FFF2CC) */
+  --check-ink: #5e4700;
+  --ok: #2c7a4b;
+  --bad: #b0372b;
+  --console: #0f1b21;
+  --console-ink: #cfe2e9;
+  --console-dim: #7f9aa5;
+  --font-ui: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "D2Coding", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418; --surface: #151d22; --sunken: #11181c; --ink: #e2e9ee; --muted: #93a2ad; --line: #28343b;
+    --accent: #72b6cf; --accent-ink: #0b1418; --accent-soft: #1a2c34; --check: #43381160; --check-ink: #ffe39a;
+    --ok: #6cc592; --bad: #f08273; --console: #0a1115; --console-ink: #cfe2e9; --console-dim: #6f8994;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418; --surface: #151d22; --sunken: #11181c; --ink: #e2e9ee; --muted: #93a2ad; --line: #28343b;
+  --accent: #72b6cf; --accent-ink: #0b1418; --accent-soft: #1a2c34; --check: #43381160; --check-ink: #ffe39a;
+  --ok: #6cc592; --bad: #f08273; --console: #0a1115; --console-ink: #cfe2e9; --console-dim: #6f8994;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font-ui);
+  padding-inline: 16px; padding-block: 28px 56px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px; }
+h1, h2 { text-wrap: balance; margin: 0; }
+h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+small, .small { font-size: 0.85rem; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+header.top .lede { color: var(--muted); max-width: 62ch; margin-top: 6px; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; }
+
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 0.85rem; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.pill[data-state="loading"] .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.pill[data-state="ready"] .dot { background: var(--ok); }
+.pill[data-state="busy"] .dot { background: var(--accent); animation: pulse 0.7s ease-in-out infinite; }
+.pill[data-state="fail"] .dot { background: var(--bad); }
+@keyframes pulse { 50% { opacity: 0.25; } }
+
+/* Tk 창 */
+.window { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px;
+  background: var(--sunken); border-bottom: 1px solid var(--line); font-size: 0.85rem; color: var(--muted); }
+.titlebar b { color: var(--ink); font-weight: 600; }
+.form { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px 14px; padding: 18px 16px 6px; align-items: center; }
+.form label.k { font-weight: 500; }
+.field { min-width: 0; border: 1px solid var(--line); background: var(--sunken); border-radius: 4px; padding: 7px 10px;
+  font-size: 0.9rem; min-height: 38px; display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.field span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field.empty span { color: var(--muted); }
+.field.drag { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; border-radius: 4px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); padding: 7px 14px; font-size: 0.9rem; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:focus-visible, input:focus-visible + label, .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; min-width: 140px; }
+button.link { border: none; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 12px; padding: 14px 16px 16px; }
+.notice { margin: 0 16px; padding: 8px 12px; border-radius: 4px; background: var(--accent-soft); font-size: 0.88rem; }
+.notice.warn { background: var(--check); color: var(--check-ink); }
+.notice.err { color: var(--bad); background: var(--sunken); border: 1px solid var(--bad); }
+
+.console { background: var(--console); color: var(--console-ink); font: 0.85rem/1.65 var(--font-mono);
+  margin: 0 16px 16px; border-radius: 4px; padding: 12px 14px; height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.console .dim { color: var(--console-dim); }
+.console .err { color: #ff9a8a; }
+
+/* 결과 */
+.result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tag { font-size: 0.75rem; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 0.9rem; color: var(--muted); }
+.stats b { font: 600 1.15rem var(--font-mono); color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.stats .chk b { color: var(--check-ink); background: var(--check); padding: 0 6px; border-radius: 3px; }
+.fname { font: 0.85rem var(--font-mono); color: var(--muted); word-break: break-all; }
+
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); background: var(--sunken); overflow-x: auto; }
+.tab { border: none; border-right: 1px solid var(--line); border-radius: 0; background: transparent; padding: 10px 18px;
+  color: var(--muted); white-space: nowrap; font-size: 0.9rem; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.tab .n { font: 0.75rem var(--font-mono); margin-left: 6px; color: var(--muted); }
+.sheet-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 10px 14px;
+  border-bottom: 1px solid var(--line); font-size: 0.85rem; color: var(--muted); }
+.sheet-tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.legend { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; background: var(--check); border: 1px solid var(--line); display: inline-block; }
+.grid-wrap { overflow: auto; max-height: 560px; }
+table { border-collapse: collapse; font-size: 0.85rem; min-width: 100%; }
+th, td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { position: sticky; top: 0; background: var(--sunken); font-weight: 600; white-space: nowrap; z-index: 1; }
+td { white-space: nowrap; }
+td.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.long { white-space: normal; min-width: 260px; max-width: 440px; }
+td.rowno, th.rowno { color: var(--muted); text-align: right; font: 0.75rem var(--font-mono); background: var(--sunken); }
+tr.need td:not(.rowno) { background: var(--check); color: var(--check-ink); }
+.empty-sheet { padding: 28px; text-align: center; color: var(--muted); }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 32px; font-size: 0.9rem; color: var(--muted); }
+.notes h2 { font-size: 0.95rem; color: var(--ink); margin-bottom: 4px; }
+.notes ul { margin: 0; padding-left: 18px; }
+code { font-family: var(--font-mono); font-size: 0.85em; background: var(--sunken); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--line); }
+
+@media (max-width: 720px) {
+  .form { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .form .btns { margin-bottom: 10px; }
+  .console { height: 180px; }
+}
+@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">통계테이블 초안 만들기</div>
+      <h1>약관 지급기준표 추출</h1>
+      <p class="lede">약관의 ‘급부명 / 지급사유 / 지급금액’ 표를 찾아 산출기준·지급율·적립금 지급여부·면책기간·경과 구간을 뽑고, 통계테이블초안 엑셀을 만듭니다. Spyder에서 <code>benefit_extractor.py</code>를 F5로 실행한 것과 같은 코드가 이 브라우저 안에서 돌아갑니다.</p>
+    </div>
+    <div class="pill" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">Python 준비 중</span></div>
+  </header>
+
+  <section class="window" aria-label="추출 실행">
+    <div class="titlebar"><b>약관 지급기준표 추출 (통계테이블 초안)</b><span>약관 파일은 이 PC 밖으로 나가지 않습니다</span></div>
+    <div class="form">
+      <label class="k" for="pick-dir">약관 폴더/파일</label>
+      <div class="field empty" id="src-field"><span id="src-text">폴더나 파일을 고르거나 여기로 끌어다 놓으세요 (.docx .docm .pdf)</span></div>
+      <div class="btns">
+        <button type="button" id="pick-dir">폴더</button>
+        <button type="button" id="pick-file">파일</button>
+      </div>
+
+      <label class="k" for="pick-code">급부코드표(선택)</label>
+      <div class="field empty" id="code-field"><span id="code-text">첫 열 = 급부코드, 둘째 열 = 급부코드명 (.xlsx)</span></div>
+      <div class="btns">
+        <button type="button" id="pick-code">파일</button>
+        <button type="button" id="clear-code" hidden>지우기</button>
+      </div>
+
+      <span class="k">결과 저장</span>
+      <div class="field"><span>통계테이블초안_날짜_시각.xlsx 로 내려받습니다</span></div>
+      <div></div>
+    </div>
+    <input class="hidden-input" type="file" id="in-dir" webkitdirectory multiple>
+    <input class="hidden-input" type="file" id="in-file" multiple accept=".docx,.docm,.doc,.pdf">
+    <input class="hidden-input" type="file" id="in-code" accept=".xlsx,.xls">
+
+    <div class="bar">
+      <button type="button" class="primary" id="run" disabled>실행</button>
+      <button type="button" id="stop" disabled>중단</button>
+      <button type="button" class="link" id="run-sample" disabled>예제 약관으로 실행</button>
+    </div>
+    <p class="notice" id="msg" hidden></p>
+    <div class="console" id="log" aria-live="polite" tabindex="0"></div>
+  </section>
+
+  <section aria-label="결과" style="display:grid; gap:14px">
+    <div class="result-head">
+      <div style="display:grid; gap:4px; min-width:0">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap"><h2>결과 미리보기</h2><span class="tag" id="result-tag">예제 결과</span></div>
+        <div class="fname" id="result-name"></div>
+      </div>
+      <button type="button" class="primary" id="download">엑셀 내려받기</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="sheet">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="sheet-tools" id="sheet-tools">
+        <span class="legend"><i></i>확인필요 행 (엑셀에서도 노란색)</span>
+        <label><input type="checkbox" id="only-check"> 확인필요만 보기</label>
+      </div>
+      <div class="grid-wrap" id="grid" role="tabpanel"></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h2>엑셀 시트</h2>
+      <ul>
+        <li><b>초안</b>: 통계테이블 형식. 감액이 있으면 경과 구간을 나눕니다 (예: 0~12 : 0.5 / 13~999 : 1).</li>
+        <li><b>특약별요약</b>: 특약마다 찾은 급부 수와 목록.</li>
+        <li><b>급부원문</b>: 표에서 읽은 원문과 각 값의 근거.</li>
+        <li><b>처리결과</b>: 파일별 성공/실패.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Spyder 실행과 다른 점</h2>
+      <ul>
+        <li>문서보안(DRM) 파일과 <code>.doc</code>는 PC의 Word로 열어야 해서 웹에서는 읽지 못합니다. 이런 파일은 Spyder에서 실행하세요.</li>
+        <li>중단하면 바로 멈추고, 그때까지의 결과는 저장되지 않습니다.</li>
+        <li>처음 열 때 Python과 pandas를 한 번 내려받느라 시간이 걸립니다.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script type="application/json" id="sample-result">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 2개, 급부 8개", "급부 8개 → 초안 9행 (확인필요 3행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "납입주기", "산출기준", "지급율", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", null, "01", 0.5, 1, 90, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", null, "01", 0.2, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", null, "01", 0.02, 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", null, "01", 0.01, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, null, "01", 1, 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, null, "01", 0.1, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, null, "01", 0.03, 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, null, "01", 1, null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"]]}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"]]}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "납입주기", "산출기준", "기본지급율", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", null, null, null, null, "01", 0.5, null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", null, null, null, null, "01", 0.2, null, null, null, null, null, 0, 1, null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", null, null, null, null, "01", 0.02, null, null, null, null, null, 90, 0, null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", null, null, null, null, "01", 0.01, null, null, null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, null, null, null, null, "01", 0.1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, null, null, null, null, "01", 0.03, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, null, null, null, null, "01", 1, 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"]]}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 8, "out2/약관/sample_policy.docx"]]}], "name": "통계테이블초안_예제.xlsx"}</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const WORD_EXT = /\.(docx|docm|doc|pdf)$/i;
+  const LONG_COLS = new Set(["확인필요", "급부목록", "근거_기준금액", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액", "경로", "결과", "별표명"]);
+
+  let src = [];            // [{path, file}]
+  let srcLabel = "";
+  let code = null;         // File
+  let worker = null;
+  let engineReady = false;
+  let running = false;
+  let result = null;       // {name, sheets, xlsx(Blob)|null, sample}
+  let activeSheet = 0;
+
+  // ---------- 상태 표시 ----------
+  function setEngine(state, text) {
+    $("engine").dataset.state = state;
+    $("engine-text").textContent = text;
+  }
+  function showMsg(text, kind) {
+    const m = $("msg");
+    if (!text) { m.hidden = true; return; }
+    m.textContent = text;
+    m.className = "notice" + (kind ? " " + kind : "");
+    m.hidden = false;
+  }
+  function logLine(text, cls) {
+    const box = $("log");
+    const line = document.createElement("div");
+    if (cls) line.className = cls;
+    line.textContent = text;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+  function refreshButtons() {
+    $("run").disabled = !engineReady || running || !src.length;
+    $("run-sample").disabled = !engineReady || running;
+    $("stop").disabled = !running;
+    for (const id of ["pick-dir", "pick-file", "pick-code", "clear-code"]) $(id).disabled = running;
+  }
+
+  // ---------- Python 작업자 ----------
+  function startWorker() {
+    engineReady = false;
+    setEngine("loading", "Python 준비 중");
+    refreshButtons();
+    worker = new Worker("worker.js");
+    worker.onmessage = (ev) => {
+      const d = ev.data;
+      if (d.type === "status") setEngine("loading", d.text);
+      else if (d.type === "ready") { engineReady = true; setEngine("ready", "준비됨"); refreshButtons(); }
+      else if (d.type === "fatal") {
+        setEngine("fail", "Python을 불러오지 못함");
+        showMsg("Python 실행 환경을 불러오지 못했습니다: " + d.message + " 인터넷 연결을 확인하고 새로고침해 주세요.", "err");
+      }
+      else if (d.type === "log") logLine(d.m);
+      else if (d.type === "done") finishRun(d);
+      else if (d.type === "error") failRun(d.message);
+    };
+    worker.onerror = (e) => {
+      setEngine("fail", "Python을 불러오지 못함");
+      showMsg("Python 실행 환경을 불러오지 못했습니다" + (e.message ? ": " + e.message : ".") + " 새로고침해 주세요.", "err");
+      e.preventDefault();
+    };
+  }
+
+  async function run(files, codeFile) {
+    if (!engineReady || running) return;
+    showMsg("");
+    running = true;
+    setEngine("busy", "추출 중");
+    refreshButtons();
+    $("log").textContent = "";
+    logLine("추출 시작...");
+    try {
+      const payload = await Promise.all(files.map(async (f) => ({ path: f.path, data: await f.file.arrayBuffer() })));
+      const codePayload = codeFile ? { name: codeFile.name, data: await codeFile.arrayBuffer() } : null;
+      worker.postMessage({ type: "run", files: payload, code: codePayload }, payload.map((p) => p.data).concat(codePayload ? [codePayload.data] : []));
+    } catch (e) {
+      failRun("파일을 읽지 못했습니다: " + e.message);
+    }
+  }
+
+  function finishRun(d) {
+    running = false;
+    setEngine("ready", "준비됨");
+    refreshButtons();
+    const sheets = JSON.parse(d.sheets);
+    setResult({ name: d.name, sheets, xlsx: new Blob([d.xlsx]), sample: false });
+    showMsg("초안을 만들었습니다. 아래에서 확인하고 엑셀로 내려받으세요.");
+    document.querySelector("[aria-label='결과']").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+  function failRun(message) {
+    running = false;
+    setEngine("ready", "준비됨");
+    refreshButtons();
+    logLine("오류: " + message, "err");
+    showMsg(message, "err");
+  }
+
+  $("stop").addEventListener("click", () => {
+    if (!running) return;
+    worker.terminate();
+    running = false;
+    logLine("중단했습니다. 웹에서는 진행 중인 결과를 저장할 수 없어 다시 실행해야 합니다.", "dim");
+    showMsg("중단했습니다. Python을 다시 불러오는 중입니다.", "warn");
+    startWorker();
+  });
+
+  // ---------- 파일 고르기 ----------
+  function setSource(list, label) {
+    const usable = list.filter((f) => WORD_EXT.test(f.path) && !f.path.split("/").pop().startsWith("~$"));
+    src = usable;
+    srcLabel = label;
+    const field = $("src-field");
+    if (!list.length) return;
+    field.classList.remove("empty");
+    if (!usable.length) {
+      $("src-text").textContent = label + " (Word/PDF 파일 없음)";
+      showMsg("고른 곳에서 Word/PDF 파일을 찾지 못했습니다.", "warn");
+    } else {
+      $("src-text").textContent = usable.length === 1 ? usable[0].path : `${label} · Word/PDF ${usable.length}개`;
+      showMsg("");
+    }
+    refreshButtons();
+  }
+  $("pick-dir").addEventListener("click", () => $("in-dir").click());
+  $("pick-file").addEventListener("click", () => $("in-file").click());
+  $("pick-code").addEventListener("click", () => $("in-code").click());
+  $("in-dir").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    if (!files.length) return;
+    const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+    setSource(files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
+    e.target.value = "";
+  });
+  $("in-file").addEventListener("change", (e) => {
+    const files = [...e.target.files];
+    if (!files.length) return;
+    setSource(files.map((f) => ({ path: f.name, file: f })), files.length === 1 ? files[0].name : "선택한 파일");
+    e.target.value = "";
+  });
+  $("in-code").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    code = f;
+    $("code-field").classList.remove("empty");
+    $("code-text").textContent = f.name;
+    $("clear-code").hidden = false;
+    e.target.value = "";
+  });
+  $("clear-code").addEventListener("click", () => {
+    code = null;
+    $("code-field").classList.add("empty");
+    $("code-text").textContent = "첫 열 = 급부코드, 둘째 열 = 급부코드명 (.xlsx)";
+    $("clear-code").hidden = true;
+  });
+
+  // 끌어다 놓기 (폴더도 가능)
+  async function readEntry(entry, prefix, out) {
+    if (entry.isFile) {
+      const file = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({ path: prefix + file.name, file });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let batch;
+      do {
+        batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+        for (const e of batch) await readEntry(e, prefix + entry.name + "/", out);
+      } while (batch.length);
+    }
+  }
+  const zone = $("src-field");
+  ["dragenter", "dragover"].forEach((t) => zone.addEventListener(t, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((t) => zone.addEventListener(t, () => zone.classList.remove("drag")));
+  zone.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    if (running) return;
+    const items = [...(e.dataTransfer.items || [])].map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    const out = [];
+    if (items.length) for (const it of items) await readEntry(it, "", out);
+    else for (const f of e.dataTransfer.files) out.push({ path: f.name, file: f });
+    const dirs = items.filter((i) => i.isDirectory);
+    setSource(out, dirs.length === 1 && items.length === 1 ? dirs[0].name + "/" : out.length === 1 ? out[0].path : "끌어다 놓은 파일");
+  });
+
+  $("run").addEventListener("click", () => {
+    if (!src.length) { showMsg("약관 폴더 또는 파일을 선택해 주세요.", "warn"); return; }
+    run(src, code);
+  });
+  $("run-sample").addEventListener("click", async () => {
+    try {
+      const r = await fetch("sample/sample_policy.docx");
+      if (!r.ok) throw new Error(r.status);
+      const file = new File([await r.blob()], "sample_policy.docx");
+      run([{ path: "sample_policy.docx", file }], null);
+    } catch (e) {
+      showMsg("예제 약관 파일을 불러오지 못했습니다.", "err");
+    }
+  });
+
+  // ---------- 결과 표 ----------
+  const sheetByName = (n) => result && result.sheets.find((s) => s.name === n);
+  function needCheck(sheet, row) {
+    const i = sheet.columns.indexOf("확인필요");
+    return i >= 0 && row[i] !== null && row[i] !== "" && sheet.name === "초안";
+  }
+  function fmt(v) {
+    if (v === null || v === undefined) return "";
+    return String(v);
+  }
+  function renderStats() {
+    const draft = sheetByName("초안");
+    const raw = sheetByName("급부원문");
+    const stat = sheetByName("처리결과");
+    const nChk = draft ? draft.rows.filter((r) => needCheck(draft, r)).length : 0;
+    const ok = stat ? stat.rows.filter((r) => r[stat.columns.indexOf("결과")] === "성공").length : 0;
+    const items = [
+      ["파일", stat ? `${ok}/${stat.rows.length}` : "0", "성공"],
+      ["급부", raw ? raw.rows.length : 0, "개"],
+      ["초안", draft ? draft.rows.length : 0, "행"],
+    ];
+    const box = $("stats");
+    box.textContent = "";
+    for (const [k, v, unit] of items) {
+      const s = document.createElement("span");
+      s.innerHTML = `${k} <b></b>${unit}`;
+      s.querySelector("b").textContent = v;
+      box.appendChild(s);
+    }
+    const c = document.createElement("span");
+    c.className = "chk";
+    c.innerHTML = "확인필요 <b></b>행";
+    c.querySelector("b").textContent = nChk;
+    box.appendChild(c);
+  }
+  function renderTabs() {
+    const tabs = $("tabs");
+    tabs.textContent = "";
+    result.sheets.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(i === activeSheet));
+      b.innerHTML = `<span></span><span class="n"></span>`;
+      b.firstChild.textContent = s.name;
+      b.lastChild.textContent = s.rows.length;
+      b.addEventListener("click", () => { activeSheet = i; renderTabs(); renderGrid(); });
+      tabs.appendChild(b);
+    });
+  }
+  function renderGrid() {
+    const sheet = result.sheets[activeSheet];
+    const isDraft = sheet.name === "초안";
+    $("sheet-tools").hidden = !isDraft;
+    const only = isDraft && $("only-check").checked;
+    const grid = $("grid");
+    grid.textContent = "";
+    const rows = sheet.rows.map((r, i) => [r, i]).filter(([r]) => !only || needCheck(sheet, r));
+    if (!rows.length) {
+      const p = document.createElement("div");
+      p.className = "empty-sheet";
+      p.textContent = sheet.rows.length ? "확인필요 행이 없습니다." : "이 시트에 행이 없습니다.";
+      grid.appendChild(p);
+      return;
+    }
+    const table = document.createElement("table");
+    const thead = table.createTHead().insertRow();
+    const th0 = document.createElement("th");
+    th0.className = "rowno";
+    thead.appendChild(th0);
+    for (const c of sheet.columns) {
+      const th = document.createElement("th");
+      th.textContent = c;
+      thead.appendChild(th);
+    }
+    const tb = table.createTBody();
+    for (const [r, i] of rows) {
+      const tr = tb.insertRow();
+      if (needCheck(sheet, r)) tr.className = "need";
+      const n = tr.insertCell();
+      n.className = "rowno";
+      n.textContent = i + 2;          // 엑셀 행 번호 (1행은 머리글)
+      r.forEach((v, j) => {
+        const td = tr.insertCell();
+        td.textContent = fmt(v);
+        if (typeof v === "number") td.className = "num";
+        else if (LONG_COLS.has(sheet.columns[j]) && String(v || "").length > 24) td.className = "long";
+      });
+    }
+    grid.appendChild(table);
+  }
+  $("only-check").addEventListener("change", renderGrid);
+
+  function setResult(r) {
+    result = r;
+    activeSheet = 0;
+    $("result-tag").hidden = !r.sample;
+    $("result-name").textContent = r.name;
+    $("download").disabled = !r.xlsx;
+    $("download").title = r.xlsx ? "" : "예제 결과는 미리보기만 됩니다. 예제 약관으로 실행하면 엑셀을 내려받을 수 있습니다.";
+    renderStats();
+    renderTabs();
+    renderGrid();
+  }
+
+  // ---------- 내려받기 ----------
+  $("download").addEventListener("click", async () => {
+    if (!result || !result.xlsx) return;
+    const filename = result.name;
+    const claudeUse = window.claude && window.claude.use;
+    if (claudeUse) {
+      const dl = await window.claude.use("downloads").catch(() => null);
+      if (dl) {
+        try {
+          await dl.save({ filename, data: result.xlsx });
+          showMsg("엑셀을 저장했습니다: " + filename);
+        } catch (e) {
+          if (e && e.code === "declined") showMsg("저장을 취소했습니다.", "warn");
+          else showMsg("이 화면에서는 파일을 저장할 수 없습니다 (" + (e && e.code || "unavailable") + ").", "err");
+        }
+        return;
+      }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(result.xlsx);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+
+  // ---------- 시작: 예제 결과를 먼저 보여 주고 Python을 미리 불러 둠 ----------
+  try {
+    const sample = JSON.parse($("sample-result").textContent);
+    for (const l of sample.log) logLine(l, "dim");
+    logLine("↑ 예제 약관(sample_policy.docx)을 실행한 기록입니다. 약관 폴더나 파일을 고른 뒤 [실행]을 누르세요.", "dim");
+    setResult({ name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
+  } catch (e) {}
+  refreshButtons();
+  startWorker();
+})();
+</script>
