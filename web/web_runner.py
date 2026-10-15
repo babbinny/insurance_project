@@ -109,7 +109,7 @@ def build_job(in_xlsx, out_dir, log=print):
     ws_t = wb.worksheets[sb.SHEET_TARGET]
     hdr, _, all_cols = sb.find_header(ws_t, sb.TABLE_COLS, ws_t.title)
     sheets = [_sheet(ws_t, hdr, sorted(all_cols.values()))]
-    for name in ("검토_상품코드", "검토_요약"):
+    for name in ("검토_상품코드", "검토_요약", "보류_주보종없음"):
         if name in wb.sheetnames:
             sheets.append(_sheet(wb[name]))
     return path, json.dumps(sheets, ensure_ascii=False)
