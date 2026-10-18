@@ -4,307 +4,321 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
 <style>
-/* 레이아웃: 회사 홈페이지 서브페이지 형식 — 흰 상단 메뉴 + 청록 밑줄, 오른쪽 위 경로, 왼쪽 메뉴, 청록 제목, 기능 탭 2개, 청록 띠 */
-/* 회사 홈페이지와 같은 밝은 화면 하나로 고정 (다크 모드 없음) */
+/* 레이아웃: 얇은 상단바 → 청록 그라데이션 소개 영역(기능 카드 4개) → 가운데 정렬 본문(흰 카드들) → 바닥글 */
+/* 회사 색(청록 #008485, 포인트 분홍)과 Noto Sans KR 유지 · 밝은 화면 하나로 고정 */
 :root {
   color-scheme: light;
   --teal: #008485;
-  --teal-dark: #006d6e;
-  --teal-light: #3db7b0;
-  --teal-pale: #e6f3f3;
+  --teal-600: #00797a;
+  --teal-700: #00676a;
+  --teal-300: #5cc1bb;
+  --teal-100: #d6efed;
+  --teal-50: #eef8f7;
   --pink: #e4007f;
-  --ink: #333333;
-  --ink-strong: #222222;
-  --muted: #777777;
-  --line: #dddddd;
-  --line-strong: #c8c8c8;
-  --panel: #f3f3f3;
+  --ink: #17262b;
+  --ink-2: #3a4a4f;
+  --muted: #6b7b80;
+  --line: #e2eaeb;
+  --line-2: #d2dddf;
+  --bg: #f4f8f8;
   --white: #ffffff;
-  --check: #fff2cc;          /* 엑셀 '확인필요' 행 색 */
+  --check: #fff2cc;
   --check-ink: #6b5000;
-  --ok: #1f8a4c;
+  --ok: #1f9d63;
   --bad: #c0392b;
+  --r-lg: 18px;
+  --r: 12px;
+  --r-sm: 9px;
+  --shadow-sm: 0 1px 2px rgba(15, 45, 50, 0.06);
+  --shadow: 0 1px 2px rgba(15, 45, 50, 0.05), 0 12px 32px -16px rgba(15, 45, 50, 0.22);
   --font: "Noto Sans KR", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
   --mono: "Roboto Mono", Consolas, "D2Coding", monospace;
 }
 * { box-sizing: border-box; }
-body { background: var(--white); color: var(--ink); font: 15px/1.65 var(--font); margin: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.65 var(--font); margin: 0; -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
-h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 p { margin: 0; }
 button, input { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
-/* 상단 메뉴 */
-.gnb { border-bottom: 4px solid var(--teal); background: var(--white); }
-.gnb-in { max-width: 1240px; margin: 0 auto; padding-inline: 16px; min-height: 78px; display: flex; align-items: center; gap: 12px 40px; flex-wrap: wrap; }
-.brand { display: flex; align-items: center; gap: 12px; color: var(--teal); font-weight: 700; font-size: 1.35rem; letter-spacing: -0.02em; white-space: nowrap; }
-.brand img { height: 40px; width: auto; display: block; }
-.gnb nav { display: flex; gap: 8px 36px; flex-wrap: wrap; font-size: 1.1rem; font-weight: 700; color: var(--ink-strong); }
-.gnb nav a { padding: 6px 0; border-bottom: 3px solid transparent; }
-.gnb nav a:hover { color: var(--teal); border-bottom-color: var(--teal); }
-.state { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
-.state[data-state="loading"] .dot, .state[data-state="busy"] .dot { background: var(--teal-light); animation: pulse 1s ease-in-out infinite; }
-.state[data-state="ready"] .dot { background: var(--ok); }
+/* ---------- 상단바 ---------- */
+.gnb { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+.gnb-in { max-width: 1160px; margin: 0 auto; padding-inline: 20px; height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.02rem; color: var(--ink); white-space: nowrap; letter-spacing: -0.02em; }
+.brand img { height: 30px; width: auto; display: block; }
+#logo-slot:not(:empty) + .brand-mark { display: none; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; flex: none;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-300) 100%); position: relative; box-shadow: 0 4px 10px -4px rgba(0, 132, 133, 0.6); }
+.brand-mark::after { content: ""; position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--pink); border: 2px solid var(--white); }
+.state { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--white);
+  border: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+.state[data-state="loading"] .dot, .state[data-state="busy"] .dot { background: var(--teal-300); animation: pulse 1s ease-in-out infinite; }
+.state[data-state="ready"] .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(31, 157, 99, 0.15); }
 .state[data-state="fail"] .dot { background: var(--bad); }
 @keyframes pulse { 50% { opacity: 0.25; } }
 
-/* 본문 틀 */
-.page { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 72px; }
-.crumb { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); }
-.crumb b { color: var(--ink-strong); font-weight: 700; }
-.crumb svg { width: 15px; height: 15px; fill: var(--ink); }
-.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 72px; margin-top: 36px; }
+/* ---------- 소개 영역 + 기능 카드 ---------- */
+.hero { position: relative; overflow: hidden; color: var(--white);
+  background:
+    radial-gradient(900px 380px at 88% -10%, rgba(92, 193, 187, 0.55), transparent 60%),
+    radial-gradient(520px 260px at 6% 120%, rgba(228, 0, 127, 0.16), transparent 60%),
+    linear-gradient(160deg, #00787a 0%, var(--teal) 45%, #0a6e72 100%); }
+.hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.18;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px); background-size: 22px 22px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 75%); -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%); }
+.hero-in { position: relative; max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 52px 34px; display: grid; gap: 14px; }
+.eyebrow { display: inline-flex; width: fit-content; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em;
+  padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.22); }
+.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #ff5db1; }
+.hero h1 { font-size: clamp(1.7rem, 3.6vw, 2.55rem); line-height: 1.28; font-weight: 700; }
+.hero-sub { max-width: 60ch; color: rgba(255, 255, 255, 0.86); font-size: 1rem; }
 
-/* 왼쪽 메뉴 */
-.lnb h2 { font-size: 2rem; font-weight: 700; color: var(--ink); letter-spacing: -0.03em; padding-bottom: 18px; border-bottom: 3px solid var(--teal); }
-.lnb ul { list-style: none; margin: 0; padding: 0; }
-.lnb > ul > li { border-bottom: 1px solid var(--line-strong); }
-.lnb > ul > li > a { display: flex; justify-content: space-between; align-items: center; padding: 18px 12px; font-size: 1.1rem; color: var(--ink-strong); }
-.lnb > ul > li > a:hover { color: var(--teal); }
-.lnb > ul > li.on > a { color: var(--teal); font-weight: 500; }
-.lnb .chev { width: 12px; height: 12px; border: solid var(--teal); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-3px, -3px); }
-.lnb .sub { background: var(--panel); padding: 10px 8px 14px; border-top: 1px solid var(--line); }
-.lnb .sub a { display: block; padding: 6px 10px; font-size: 0.95rem; color: var(--ink); }
-.lnb .sub a:hover { color: var(--teal); }
-.lnb .sub a.cur { background: var(--teal); color: var(--white); font-weight: 500; }
+.tooltabs { margin-top: 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tooltab { text-align: left; display: flex; gap: 12px; align-items: flex-start; padding: 16px; cursor: pointer;
+  border-radius: var(--r); border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.1); color: var(--white);
+  transition: background 0.18s, transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.tooltab:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-2px); }
+.tool-ico { width: 38px; height: 38px; flex: none; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.16); }
+.tool-ico svg { width: 21px; height: 21px; }
+.tool-txt { display: grid; gap: 2px; min-width: 0; }
+.tool-txt b { font-size: 1rem; font-weight: 700; }
+.tool-txt small { font-size: 0.8rem; color: rgba(255, 255, 255, 0.78); line-height: 1.45; }
+.tooltab[aria-selected="true"] { background: var(--white); color: var(--ink); border-color: var(--white); box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.45); }
+.tooltab[aria-selected="true"] .tool-ico { background: var(--teal-50); color: var(--teal); }
+.tooltab[aria-selected="true"] .tool-txt small { color: var(--muted); }
 
-/* 제목 · 안내 */
-.page-title { font-size: 2.3rem; font-weight: 700; color: var(--teal); letter-spacing: -0.03em; }
-.lead { margin-top: 18px; font-size: 1.05rem; color: var(--ink); max-width: 62ch; }
-.steps { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--ink-strong); border-bottom: 1px solid var(--line-strong); }
-.step { padding: 22px 22px 24px; display: grid; gap: 8px; align-content: start; }
-.step + .step { border-left: 1px solid var(--line); }
-.step .no { font: 700 0.8rem var(--font); color: var(--pink); letter-spacing: 0.08em; }
-.step h3 { font-size: 1.1rem; font-weight: 700; color: var(--ink-strong); }
-.step p { font-size: 0.92rem; color: var(--muted); }
-.step b { color: var(--ink); font-weight: 500; }
+/* ---------- 본문 ---------- */
+.main { max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 30px 64px; }
+.panel { display: grid; gap: 22px; }
+.panel[hidden] { display: none !important; }
+.lead { font-size: 1.08rem; color: var(--ink-2); max-width: 70ch; }
+.lead b { color: var(--teal-700); font-weight: 700; }
 
-.sec { margin-top: 56px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; scroll-margin-top: 16px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; counter-reset: step; }
+.step { position: relative; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 18px 18px 62px;
+  display: grid; gap: 4px; align-content: start; box-shadow: var(--shadow-sm); }
+.step::before { counter-increment: step; content: counter(step); position: absolute; left: 18px; top: 18px; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: 0.9rem; color: var(--teal); background: var(--teal-50); border: 1px solid var(--teal-100); }
+.step .no { display: none; }
+.step h3 { font-size: 1rem; font-weight: 700; color: var(--ink); }
+.step p { font-size: 0.88rem; color: var(--muted); }
+.step b { color: var(--ink-2); font-weight: 500; }
+.step a, .lead a { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+.sheets-list { margin: 4px 0 2px; padding-left: 18px; font-size: 0.84rem; color: var(--muted); }
+.sheets-list b { color: var(--ink-2); font-weight: 500; }
+
+.sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; scroll-margin-top: 80px; }
 .sec > * { min-width: 0; }
-.sec-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-size: 1.35rem; font-weight: 700; color: var(--ink-strong); }
-.sec-title::before { content: ""; width: 6px; height: 22px; background: var(--teal); }
-.tag { font-size: 0.75rem; font-weight: 500; padding: 2px 8px; border: 1px solid var(--teal); color: var(--teal); }
+.sec-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 1.18rem; font-weight: 700; color: var(--ink); }
+.tag { font-size: 0.72rem; font-weight: 500; padding: 2px 10px; border-radius: 999px; background: var(--teal-50); color: var(--teal-700); border: 1px solid var(--teal-100); }
 
-/* 실행 상자 (청록 띠 + 입력) */
-.runbox { border: 1px solid var(--line-strong); }
-.band { background: var(--teal); color: var(--white); padding: 16px 22px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 16px; }
-.band strong { font-size: 1.15rem; font-weight: 700; }
-.band span { font-size: 0.88rem; opacity: 0.9; }
-.form { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; }
-.form > * { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 6px; min-width: 0; }
-.form .k { background: var(--panel); font-weight: 500; color: var(--ink-strong); }
-.field { min-height: 40px; border: 1px solid var(--line-strong) !important; padding: 7px 12px !important; margin: 10px 0; background: var(--white); font-size: 0.92rem; overflow: hidden; }
-.form > .field { margin: 10px 0 10px 16px; }
+/* 실행 카드 */
+.runbox { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.band { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 16px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.band strong { font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.band span { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.band span::before { content: ""; width: 14px; height: 14px; flex: none; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.form { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 12px 14px; padding: 18px 22px 4px; align-items: center; }
+.form > * { min-width: 0; }
+.form .k { font-size: 0.88rem; font-weight: 500; color: var(--ink-2); }
+.form .k small { color: var(--muted); font-weight: 400; }
+.field { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-sm); border: 1.5px dashed var(--line-2);
+  background: #fafcfc; font-size: 0.9rem; overflow: hidden; transition: border-color 0.15s, background 0.15s; }
+.field::before { content: ""; width: 18px; height: 18px; flex: none; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.field.empty::before { background: var(--line-2); }
+.field:not(.empty) { border-style: solid; border-color: var(--teal-100); background: var(--teal-50); }
+.field:hover { border-color: var(--teal-300); }
 .field span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.field.empty span { color: #999; }
-.field.drag { outline: 2px dashed var(--teal); outline-offset: 2px; }
-.btns { flex-wrap: wrap; }
-button { cursor: pointer; border: 1px solid var(--line-strong); background: var(--white); color: var(--ink-strong); padding: 8px 16px; font-size: 0.9rem; border-radius: 0; }
-button:hover:not(:disabled) { border-color: var(--teal); color: var(--teal); }
+.field.empty span { color: #98a6aa; }
+.field.drag { border-color: var(--teal); background: var(--teal-50); }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+button { cursor: pointer; border: 1px solid var(--line-2); background: var(--white); color: var(--ink-2); padding: 9px 15px; font-size: 0.88rem;
+  border-radius: var(--r-sm); transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s; }
+button:hover:not(:disabled) { border-color: var(--teal-300); color: var(--teal-700); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary { background: var(--teal); border-color: var(--teal); color: var(--white); font-weight: 700; min-width: 150px; padding: 11px 22px; font-size: 1rem; }
-button.primary:hover:not(:disabled) { background: var(--teal-dark); color: var(--white); }
-button.ghost { border-color: var(--teal); color: var(--teal); padding: 11px 18px; font-size: 1rem; }
-button.link { border: none; background: none; padding: 4px; color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+button.primary { background: var(--teal); border-color: var(--teal); color: var(--white); font-weight: 700; min-width: 150px; padding: 12px 24px; font-size: 0.98rem;
+  box-shadow: 0 8px 18px -10px rgba(0, 132, 133, 0.85); }
+button.primary:hover:not(:disabled) { background: var(--teal-600); color: var(--white); transform: translateY(-1px); }
+button.ghost { padding: 12px 18px; font-size: 0.98rem; }
+button.link { border: none; background: none; padding: 6px; color: var(--teal); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; box-shadow: none; }
+button.link:hover:not(:disabled) { color: var(--teal-700); }
 .hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; padding: 20px 16px; }
-.notice { margin: 0 16px 14px; padding: 10px 14px; background: var(--teal-pale); color: var(--teal-dark); font-size: 0.92rem; }
-.notice.warn { background: var(--check); color: var(--check-ink); }
-.notice.err { background: #fdecea; color: var(--bad); }
-.console { margin: 0 16px 16px; background: var(--panel); border: 1px solid var(--line); padding: 12px 14px; height: 200px; overflow: auto;
-  font: 0.83rem/1.7 var(--mono); color: var(--ink); white-space: pre-wrap; word-break: break-all; }
-.console .dim { color: var(--muted); }
+.bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; padding: 18px 22px 20px; }
+.notice { margin: 0 22px 14px; padding: 11px 14px; border-radius: var(--r-sm); background: var(--teal-50); color: var(--teal-700); font-size: 0.9rem; border: 1px solid var(--teal-100); }
+.notice.warn { background: var(--check); color: var(--check-ink); border-color: #f3e2a8; }
+.notice.err { background: #fdeeec; color: var(--bad); border-color: #f5cdc7; }
+.console { margin: 0 22px 22px; background: #f7fafa; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; height: 170px; overflow: auto;
+  font: 0.8rem/1.75 var(--mono); color: var(--ink-2); white-space: pre-wrap; word-break: break-all; }
+.console .dim { color: #8a989c; }
 .console .err { color: var(--bad); }
 
-/* 결과 */
-.result-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 20px; padding: 16px 18px; background: var(--panel); border-top: 2px solid var(--ink-strong); }
-.fname { font: 0.85rem var(--mono); color: var(--muted); word-break: break-all; }
-.stats { display: flex; flex-wrap: wrap; gap: 6px 26px; font-size: 0.92rem; color: var(--muted); margin-top: 4px; }
-.stats b { font: 700 1.2rem var(--font); color: var(--teal); font-variant-numeric: tabular-nums; margin-right: 3px; }
-.stats .chk b { color: var(--check-ink); background: var(--check); padding: 0 6px; }
-.sheet { border: 1px solid var(--line-strong); border-top: none; }
-.tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line-strong); background: var(--white); }
-.tab { border: none; border-right: 1px solid var(--line); background: var(--white); padding: 12px 22px; color: var(--muted); white-space: nowrap; font-size: 0.95rem; }
-.tab:hover:not(:disabled) { color: var(--teal); }
-.tab[aria-selected="true"] { background: var(--teal); color: var(--white); font-weight: 700; }
-.tab .n { font: 0.75rem var(--mono); margin-left: 6px; opacity: 0.8; }
-.sheet-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 10px 16px; font-size: 0.85rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+/* 결과 카드 */
+.result-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px 20px; padding: 18px 20px;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow-sm); }
+.fname { font: 0.8rem var(--mono); color: var(--muted); word-break: break-all; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.stats > span { display: inline-flex; align-items: baseline; gap: 4px; padding: 6px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line);
+  font-size: 0.82rem; color: var(--muted); }
+.stats b { font: 700 1.12rem var(--font); color: var(--teal-700); font-variant-numeric: tabular-nums; margin-left: 2px; }
+.stats .chk { background: #fffaea; border-color: #f3e2a8; }
+.stats .chk b { color: var(--check-ink); background: none; padding: 0; }
+.sheet { background: var(--white); border: 1px solid var(--line); border-top: none; border-radius: 0 0 var(--r-lg) var(--r-lg); overflow: hidden; box-shadow: var(--shadow); }
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #fafcfc; }
+.tab { border: none; border-radius: 8px; background: transparent; padding: 7px 14px; color: var(--muted); white-space: nowrap; font-size: 0.88rem; font-weight: 500; }
+.tab:hover:not(:disabled) { color: var(--teal-700); background: var(--teal-50); }
+.tab[aria-selected="true"] { background: var(--white); color: var(--teal-700); font-weight: 700; box-shadow: 0 0 0 1px var(--teal-100), 0 2px 6px -2px rgba(0, 104, 106, 0.25); }
+.tab .n { font: 0.72rem var(--mono); margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.tab[aria-selected="true"] .n { background: var(--teal-50); color: var(--teal-700); }
+.sheet-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 10px 16px; font-size: 0.82rem; color: var(--muted); border-bottom: 1px solid var(--line); }
 .sheet-tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
-.sheet-tools input { accent-color: var(--teal); }
-.step a, .lead a { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+input[type="checkbox"] { accent-color: var(--teal); }
 .legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 14px; height: 14px; border: 1px solid var(--line-strong); display: inline-block; }
-.more { padding: 8px 16px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); }
-
-/* 기능 탭 */
-.tooltabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 26px; border-bottom: 3px solid var(--teal); }
-.tooltab { text-align: left; padding: 16px 22px; border: 1px solid var(--line-strong); border-bottom: none; background: var(--panel); color: var(--muted); display: grid; gap: 2px; }
-.tooltab + .tooltab { border-left: none; }
-.tooltab b { font-size: 1.15rem; font-weight: 700; color: var(--ink-strong); }
-.tooltab small { font-size: 0.85rem; }
-.tooltab:hover:not(:disabled) { color: var(--teal); }
-.tooltab[aria-selected="true"] { background: var(--teal); border-color: var(--teal); color: var(--white); }
-.tooltab[aria-selected="true"] b { color: var(--white); }
-.panel { margin-top: 30px; }
-.sheets-list { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--muted); }
-.sheets-list b { color: var(--ink); font-weight: 500; }
+.legend i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); display: inline-block; }
+.more { padding: 9px 16px; font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--line); }
 .grid-wrap { overflow: auto; max-height: 560px; }
-table { border-collapse: collapse; font-size: 0.85rem; min-width: 100%; }
-th, td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
-th { position: sticky; top: 0; z-index: 1; background: var(--teal-pale); color: var(--ink-strong); font-weight: 700; white-space: nowrap; }
-td { white-space: nowrap; }
+table { border-collapse: separate; border-spacing: 0; font-size: 0.84rem; min-width: 100%; }
+th, td { border-bottom: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+th { position: sticky; top: 0; z-index: 1; background: #f3f8f8; color: var(--ink-2); font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+td { white-space: nowrap; color: var(--ink); }
+tbody tr:hover td { background: #f7fbfb; }
 td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td.long { white-space: normal; min-width: 260px; max-width: 440px; }
-td.rowno, th.rowno { color: var(--muted); text-align: right; font: 0.75rem var(--mono); background: var(--panel); }
-tr.marked td:not(.rowno) { color: var(--ink-strong); }
-.empty-sheet { padding: 28px; text-align: center; color: var(--muted); }
+td.rowno, th.rowno { color: #9aa8ac; text-align: right; font: 0.72rem var(--mono); background: #fafcfc; }
+tr.marked td:not(.rowno) { color: var(--ink); }
+.empty-sheet { padding: 32px; text-align: center; color: var(--muted); }
 
-.notes { margin: 0; padding: 18px 22px 18px 38px; background: var(--panel); border-top: 2px solid var(--ink-strong); display: grid; gap: 6px; font-size: 0.93rem; }
+/* 알아두세요 */
+.notes { margin: 0; padding: 18px 22px 18px 40px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; gap: 8px; font-size: 0.9rem; color: var(--ink-2); }
 .notes li::marker { color: var(--teal); }
-.notes b { font-weight: 500; color: var(--ink-strong); }
+.notes b { font-weight: 700; color: var(--ink); }
+code { font-family: var(--mono); font-size: 0.85em; background: var(--bg); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
 
-@media (max-width: 960px) {
-  .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 16px; }
-  .lnb h2 { font-size: 1.5rem; padding-bottom: 12px; }
-  .lnb > ul > li:not(.on), .lnb > ul > li.on > a { display: none; }
-  .lnb .sub { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: none; }
-  .page-title { font-size: 1.8rem; }
-  .steps { grid-template-columns: minmax(0, 1fr); }
-  .tooltab { padding: 12px 14px; }
-  .tooltab small { display: none; }
-  .tooltabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tooltab:nth-child(3) { border-left: 1px solid var(--line-strong); }
-  .tooltab b { font-size: 0.98rem; }
-  .step + .step { border-left: none; border-top: 1px solid var(--line); }
-}
-@media (max-width: 640px) {
-  .gnb-in { min-height: 64px; padding-block: 10px; }
-  .gnb nav { font-size: 0.95rem; gap: 4px 18px; }
-  .state { margin-left: 0; }
-  .form { grid-template-columns: minmax(0, 1fr); }
-  .form > * { border-bottom: none; padding-block: 6px; }
-  .form > .field { margin: 0 16px; }
-  .form > .k { margin-top: 8px; }
-  .crumb { justify-content: flex-start; flex-wrap: wrap; }
-}
-@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } html { scroll-behavior: auto; } }
-html { scroll-behavior: smooth; }
-.gnb nav a.cur { color: var(--teal); border-bottom-color: var(--teal); }
-
-/* 약관 정보 */
-.info-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; padding: 14px 18px; background: var(--panel); border-top: 2px solid var(--ink-strong); }
-.info-bar input[type="search"] { border: 1px solid var(--line-strong); padding: 8px 12px; font-size: 0.92rem; min-width: 0; width: 260px; max-width: 100%; }
-.prod { margin-top: 22px; display: grid; gap: 8px; }
-.prod h3 { font-size: 1.15rem; font-weight: 700; color: var(--teal); }
-.prod .meta { font-size: 0.85rem; color: var(--muted); }
-.info-wrap { overflow-x: auto; border-top: 2px solid var(--teal); }
-.info { border-collapse: collapse; width: 100%; min-width: 820px; font-size: 0.9rem; }
-.info th { position: static; background: var(--teal-pale); text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-.info td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: normal; }
+/* ---------- 약관 정보 ---------- */
+.info-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; padding: 16px 18px;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.info-bar .stats { margin-top: 0; }
+.info-bar input[type="search"] { border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px 14px; font-size: 0.9rem; min-width: 0; width: 280px; max-width: 100%; background: #fafcfc; }
+.info-bar input[type="search"]:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-100); background: var(--white); }
+.prod { margin-top: 18px; display: grid; gap: 8px; }
+.prod h3 { font-size: 1.08rem; font-weight: 700; color: var(--teal-700); }
+.prod .meta { font-size: 0.82rem; color: var(--muted); }
+.info-wrap { overflow-x: auto; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); }
+.info { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 820px; font-size: 0.88rem; }
+.info th { position: static; }
+.info td { padding: 14px 12px; white-space: normal; }
+.info tbody tr:last-child td { border-bottom: none; }
 .info td.ben { width: 17%; }
-.info td.why { width: 30%; color: var(--ink); }
+.info td.why { width: 30%; color: var(--ink-2); }
 .info td.amt { width: 25%; }
 .info td.wait, .info td.res { width: 14%; }
-.info .main { font-weight: 500; color: var(--ink-strong); }
-.info .big { font-size: 1.05rem; font-weight: 700; color: var(--ink-strong); }
-.info .sub { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
-.info .flag { display: inline-block; margin-top: 6px; padding: 1px 7px; font-size: 0.75rem; background: var(--check); color: var(--check-ink); }
-.info .memo { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--check-ink); }
+.info .main { font-weight: 500; color: var(--ink); }
+.info .big { font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.info .sub { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--muted); }
+.info .flag { display: inline-block; margin-top: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; background: var(--check); color: var(--check-ink); }
+.info .memo { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--check-ink); }
 .info .yes { color: var(--teal); }
 .info .no { color: var(--muted); }
-.info .unk { color: var(--check-ink); background: var(--check); padding: 0 4px; }
+.info .unk { color: var(--check-ink); background: var(--check); padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; }
 .info tr.hide { display: none; }
 
-/* 약관 비교 */
-.cmp-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
-.cmp-files > div { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; min-width: 0; }
-.cmp-files > div + div { border-left: 1px solid var(--line); }
-.cmp-files .k { font-weight: 700; color: var(--ink-strong); }
+/* ---------- 약관 비교 ---------- */
+.cmp-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 18px 22px 4px; }
+.cmp-files > div { display: grid; gap: 8px; min-width: 0; }
+.cmp-files .k { font-size: 0.88rem; font-weight: 500; color: var(--ink-2); }
 .cmp-files .field { margin: 0; }
-.pill { display: inline-block; padding: 1px 8px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
-.pill.변경 { background: #FFF2CC; color: #6b5000; }
-.pill.신설, .pill.추가 { background: #DDEBF7; color: #1d4f7a; }
-.pill.삭제 { background: #F8CBAD; color: #7a2e12; }
-.pill.동일 { background: var(--panel); color: var(--muted); }
-.pill.이름 { background: var(--teal-pale); color: var(--teal-dark); }
-.cmp-section { margin-top: 26px; display: grid; gap: 10px; }
-.cmp-section h3 { font-size: 1.08rem; font-weight: 700; color: var(--ink-strong); }
-.cmp-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--teal); }
-.cmp-list > li { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+.pill.변경 { background: #fff2cc; color: #6b5000; }
+.pill.신설, .pill.추가 { background: #dcebf8; color: #1d4f7a; }
+.pill.삭제 { background: #fbdccf; color: #7a2e12; }
+.pill.동일 { background: var(--bg); color: var(--muted); }
+.pill.이름 { background: var(--teal-50); color: var(--teal-700); }
+.cmp-section { margin-top: 18px; display: grid; gap: 10px; }
+.cmp-section h3 { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+.cmp-list { list-style: none; margin: 0; padding: 0; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow-sm); }
+.cmp-list > li { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.cmp-list > li:last-child { border-bottom: none; }
 .cmp-list > li.hide { display: none; }
-.cmp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
-.cmp-head b { font-size: 1rem; color: var(--ink-strong); }
-.cmp-head small { color: var(--muted); font-size: 0.82rem; }
-.chg { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 4px 12px; font-size: 0.9rem; }
+.cmp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cmp-head b { font-size: 0.98rem; color: var(--ink); }
+.cmp-head small { color: var(--muted); font-size: 0.8rem; }
+.chg { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 5px 12px; margin: 0; font-size: 0.88rem; }
 .chg dt { color: var(--muted); font-weight: 500; }
 .chg dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.diff del { background: #fbe0dc; color: #9c2b1c; text-decoration: line-through; padding: 0 2px; }
-.diff ins { background: #d6efe0; color: #155f37; text-decoration: none; padding: 0 2px; font-weight: 500; }
-.cmp-note { font-size: 0.85rem; color: var(--muted); }
-details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink-strong); padding: 6px 0; }
+.diff del { background: #fde3df; color: #9c2b1c; text-decoration: line-through; padding: 1px 4px; border-radius: 4px; }
+.diff ins { background: #d8f1e4; color: #155f37; text-decoration: none; padding: 1px 4px; border-radius: 4px; font-weight: 500; }
+.cmp-note { font-size: 0.82rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink); padding: 6px 0; }
+
+/* ---------- 바닥글 ---------- */
+.foot { border-top: 1px solid var(--line); background: var(--white); }
+.foot-in { max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 18px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px;
+  font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- 좁은 화면 ---------- */
+@media (max-width: 960px) {
+  .tooltabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 640px) {
-  .cmp-files { grid-template-columns: minmax(0, 1fr); }
-  .cmp-files > div + div { border-left: none; }
+  .gnb-in, .hero-in, .main, .foot-in { padding-inline: 16px; }
+  .hero-in { padding-block: 34px 24px; }
+  .tooltab { padding: 12px; gap: 10px; }
+  .tool-ico { width: 32px; height: 32px; }
+  .tool-txt small { display: none; }
+  .form { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 16px 16px 4px; }
+  .form .k { margin-top: 6px; }
+  .band, .bar { padding-inline: 16px; }
+  .notice, .console { margin-inline: 16px; }
+  .cmp-files { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 4px; }
   .chg { grid-template-columns: minmax(0, 1fr); }
+  .state { padding: 5px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .dot { animation: none !important; }
+  .tooltab, button { transition: none; }
+  .tooltab:hover, button.primary:hover:not(:disabled) { transform: none; }
 }
 </style>
-
 <header class="gnb">
   <div class="gnb-in">
-    <a class="brand" href="#extract"><span id="logo-slot"></span>통계테이블 작성 도구</a>
-    <nav aria-label="기능">
-      <a href="#extract" data-tool-link="extract">약관에서 추출</a>
-      <a href="#revise" data-tool-link="revise">개정 후 자동화</a>
-      <a href="#info" data-tool-link="info">약관 정보</a>
-      <a href="#compare" data-tool-link="compare">약관 비교</a>
-    </nav>
+    <a class="brand" href="#extract"><span id="logo-slot"></span><span class="brand-mark" aria-hidden="true"></span><span>통계테이블 작성 도구</span></a>
     <div class="state" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">준비 중</span></div>
   </div>
 </header>
 
-<div class="page">
-  <div class="crumb">
-    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 1 7.6h2.1V14h3.6V10h2.6v4h3.6V7.6H15z"/></svg>
-    <span>&gt; 업무도구 &gt; 통계테이블 작성 &gt;</span><b id="crumb-tool">약관에서 추출</b>
-  </div>
-
-  <div class="layout">
-    <aside class="lnb" aria-label="메뉴">
-      <h2>업무도구</h2>
-      <ul>
-        <li class="on">
-          <a href="#extract">통계테이블 작성 <i class="chev"></i></a>
-          <ul class="sub">
-            <li><a href="#extract" data-tool-link="extract">약관에서 추출</a></li>
-            <li><a href="#revise" data-tool-link="revise">개정 후 자동화</a></li>
-            <li><a href="#info" data-tool-link="info">약관 정보</a></li>
-            <li><a href="#compare" data-tool-link="compare">약관 비교</a></li>
-          </ul>
-        </li>
-      </ul>
-    </aside>
-
-    <main>
-      <h1 class="page-title">통계테이블 작성</h1>
-
-      <div class="tooltabs" role="tablist" aria-label="기능 선택">
+<section class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">보험 약관 업무도구</p>
+    <h1>약관에서 통계테이블까지,<br>한 화면에서 끝냅니다.</h1>
+    <p class="hero-sub">PDF·Word 약관을 올리면 지급기준표를 읽어 초안을 만들고, 개정 · 요약 · 비교까지 도와드립니다. 파일은 이 PC 밖으로 나가지 않습니다.</p>
+    <div class="tooltabs" role="tablist" aria-label="기능 선택">
         <button type="button" class="tooltab" role="tab" id="tab-extract" data-tool="extract" aria-controls="panel-extract">
-          <b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small>
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4"/></svg></span><span class="tool-txt"><b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small></span>
         </button>
         <button type="button" class="tooltab" role="tab" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
-          <b>개정 후 자동화</b><small>기존 테이블 + 상품코드 변경 → 개정 후 테이블</small>
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg></span><span class="tool-txt"><b>개정 후 자동화</b><small>기존 테이블 + 코드 변경 → 개정 후 테이블</small></span>
         </button>
         <button type="button" class="tooltab" role="tab" id="tab-info" data-tool="info" aria-controls="panel-info">
-          <b>약관 정보</b><small>급부별 보험금 · 면책기간 · 적립금 요약</small>
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/></svg></span><span class="tool-txt"><b>약관 정보</b><small>급부별 보험금 · 면책 · 적립금 요약</small></span>
         </button>
         <button type="button" class="tooltab" role="tab" id="tab-compare" data-tool="compare" aria-controls="panel-compare">
-          <b>약관 비교</b><small>변경 전·후 약관에서 달라진 점</small>
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.8"/><path d="M5.5 9h2.5M5.5 12.5h2.5M16 9h2.5M16 12.5h2.5"/></svg></span><span class="tool-txt"><b>약관 비교</b><small>변경 전·후 약관의 달라진 점</small></span>
         </button>
       </div>
+  </div>
+</section>
 
+<main class="main">
       <!-- ===================== 약관에서 추출 ===================== -->
       <div class="panel" id="panel-extract" role="tabpanel" aria-labelledby="tab-extract">
         <p class="lead">상품 약관에서 보험금 지급기준표를 찾아 <b>통계테이블 초안 엑셀</b>을 만들어 드립니다.</p>
@@ -546,9 +560,14 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink-s
           </ul>
         </section>
       </div>
-    </main>
+</main>
+
+<footer class="foot">
+  <div class="foot-in">
+    <span>파일은 브라우저 안에서만 처리되고, 결과는 엑셀로 내려받습니다.</span>
+    <span>통계테이블 작성 도구</span>
   </div>
-</div>
+</footer>
 
 <script type="application/json" id="sample-extract">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 4개, 급부 14개", "급부 14개 → 초안 15행 (확인필요 4행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "약관급부명", "매칭근거", "산출기준", "지급율", "지급주기", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", "01", 0.5, "100", 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", "01", 1, "100", 1, 0, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", "유사암진단", "약관 급부명", "01", 0.2, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", "일반암 입원", "지급사유 질병명: 암", "01", 0.02, "100", 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", "일반암 통원", "지급사유 질병명: 암", "01", 0.01, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, "상해사망", "약관 급부명", "01", 1, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, "상해수술", "약관 급부명", "01", 0.1, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, "골절진단", "약관 급부명", "01", 0.03, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, "상해후유장해", "약관 급부명", "01", 1, "100", null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"], ["sample_policy.docx", "무배당 예제저축특약", "사망보험금", "제3조", "사망", "약관 급부명", "10", 1, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제저축특약", "만기환급금", "제4조", "만기환급금", "약관 급부명", "03", 1, "100", null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"], ["sample_policy.docx", "무배당 예제저축특약", "중도급부금", "제5조", "중도급부금", "약관 급부명", "02", 0.5, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제저축특약", "생활자금", "제6조", "생활자금", "약관 급부명", "01", 0.01, "211", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제구좌형특약", "질병입원일당", "제3조", "질병입원일당", "약관 급부명", "95", 0.002, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제구좌형특약", "질병수술비", "제4조", "질병수술", "약관 급부명", "95", 0.05, "100", 0, 0, 0, 999, null]], "colors": ["#FFF2CC", "#FFF2CC", null, null, null, null, null, null, "#FFF2CC", null, "#FFF2CC", null, null, null, null], "total": 15}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", 4, 1, "사망보험금, 만기환급금, 중도급부금, 생활자금"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", 2, 0, "질병입원일당, 질병수술비"]], "colors": [null, null, null, null], "total": 4}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "약관급부명", "매칭근거", "납입주기", "산출기준", "기본지급율", "지급주기", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_산출기준", "근거_지급주기", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", null, "01", 1, "100", null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "보험가입금액", null, "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", "유사암진단", "약관 급부명", null, "01", 0.2, "100", null, null, null, null, null, 0, 1, null, "보험가입금액", null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", "일반암 입원", "지급사유 질병명: 암", null, "01", 0.02, "100", null, null, null, null, null, 90, 0, null, "보험가입금액", null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", "일반암 통원", "지급사유 질병명: 암", null, "01", 0.01, "100", null, null, null, null, null, 0, 0, null, "보험가입금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, "상해사망", "약관 급부명", null, "01", 1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, "금액", null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, "상해수술", "약관 급부명", null, "01", 0.1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, "금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, "골절진단", "약관 급부명", null, "01", 0.03, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, "금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, "상해후유장해", "약관 급부명", null, "01", 1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", "금액", null, null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "사망보험금", "제3조", "사망", "약관 급부명", null, "10", 1, "100", null, null, null, null, null, 0, 1, null, "MAX(", null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 피보험자가 사망하였을 때", "MAX(보험가입금액, 기납입보험료 합계) × 추가설계 사망보험금 비율"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "만기환급금", "제4조", "만기환급금", "약관 급부명", null, "03", 1, "100", null, null, null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", "기납입보험료", null, null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간이 끝날 때까지 피보험자가 살아 있을 때", "기납입보험료의 100%"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "중도급부금", "제5조", "중도급부금", "약관 급부명", "월납", "02", 0.5, "100", null, null, null, null, null, 0, 1, null, "월납", null, null, "보장개시일 문구 없음 → 0", "특정 시점 1회 지급", "계약일부터 10년 경과시점에 피보험자가 살아 있을 때", "[월납] 월납보험료의 50%"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "생활자금", "제6조", "생활자금", "약관 급부명", null, "01", 0.01, "211", null, null, null, null, null, 0, 0, null, "보험가입금액", "매월계약해당일에피보험자가살아있을때(120회", null, "보장개시일 문구 없음 → 0", "반복 지급", "계약일부터 10년 경과시점부터 매월 계약해당일에 피보험자가 살아 있을 때 (120회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", "질병입원일당", "제3조", "질병입원일당", "약관 급부명", null, "95", 0.002, "100", 10000000, "[기준: 1구좌 = 보험료 1,000만원]", null, null, null, 0, 0, null, "1구좌(보험료 10,000,000원)", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "질병으로 4일 이상 계속 입원하였을 때 (3일 초과 1일당)", "1구좌당 2만원"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", "질병수술비", "제4조", "질병수술", "약관 급부명", null, "95", 0.05, "100", 10000000, "[기준: 1구좌 = 보험료 1,000만원]", null, null, null, 0, 0, null, "1구좌(보험료 10,000,000원)", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "질병으로 수술을 받았을 때 (수술 1회당)", "1구좌당 50만원"]], "colors": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "total": 14}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 14, "sample_policy.docx"]], "colors": [null], "total": 1}], "name": "통계테이블초안_예제.xlsx"}</script>
 <script type="application/json" id="sample-revise">{"log": ["기존 테이블 9행 / 관계 5건 / 변경전후 6건", "  완료: 2건", "  확인필요: 1건", "  기존 행 없음: 2건", "작성 대상(변경후 코드): 5개 → 작성 행 수: 8", "결과 파일: 통계테이블_자동작성_예제.xlsx"], "sheets": [{"name": "통계테이블 작성대상", "columns": ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1", "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"], "rows": [["A200", "A2001", "B0101", "01", 0.5, "100", 1, 90, 0, 12], ["A200", "A2001", "B0101", "01", 1, "100", 1, 0, 13, 999], ["A200", "A2001", "B0102", "01", 0.2, "100", 1, 0, 0, 999], ["A200", "A2001", "B0201", "01", 0.02, "100", 0, 90, 0, 999], ["A200", "A2002", "B0301", "01", 1, "100", 1, 0, 0, 999], ["A200", "A2002", "B0302", "01", 0.1, "100", 0, 0, 0, 999], ["A200", "A2003", "B0401", "02", 1, "100", 1, 0, 0, 999], ["A200", "A2003", "B0402", "03", 1, "211", 1, 0, 0, 999]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "검토_상품코드", "columns": ["주보종코드", "개별상품코드(변경후)", "변경전코드", "상태", "작성행수", "급부코드", "급부명", "비고", "주보종명", "개별상품명"], "rows": [["A200", "A2001", "A1001", "완료", 4, "B0101, B0102, B0201", "암진단비, 유사암진단비, 암입원비", null, "(무)예제건강보험Ⅱ", "(무)예제암진단특약Ⅱ"], ["A200", "A2002", "A1002", "완료", 2, "B0301, B0302", "상해사망, 상해수술비", null, "(무)예제건강보험Ⅱ", "(무)예제상해보장특약Ⅱ"], ["A200", "A2003", "A1003, A1005", "확인필요", 2, "B0401, B0402", "납입면제, 보험료환급", "변경전 코드가 2개 (A1003, A1005) → 행을 합침", "(무)예제건강보험Ⅱ", "(무)예제납입면제특약Ⅱ"], ["A200", "A2006", "A1007", "기존 행 없음", 0, null, null, "기존 테이블에 A1007 행 없음", "(무)예제건강보험Ⅱ", "(무)예제수술특약Ⅱ"], [null, "A2009", "A1009", "기존 행 없음", 0, null, null, "기존 테이블에 A1009 행 없음", null, null]], "colors": [null, null, "#FFF2CC", "#F8CBAD", "#F8CBAD"], "total": 5}, {"name": "검토_요약", "columns": ["상태", "건수", "설명"], "rows": [["완료", 2, "변경전 코드의 기존 행을 그대로 이어받음"], ["확인필요", 1, "이어받았지만 비고 확인 필요 (변경전 코드 여러 개, 주보종 여러 개 등)"], ["기존 행 없음", 2, "변경전 코드가 기존 테이블에 없음 → 약관 보고 직접 작성"], ["신규(변경전 없음)", 0, "변경전 코드가 비어 있음 → 신규 상품, 약관 보고 직접 작성"], ["주보종 모름", 0, "변경후 코드가 관계 테이블에 없음 → 행은 '보류_주보종없음' 시트에 있음"], ["작성 대상(변경후 코드)", 5, "변경전,후 상품코드 시트 기준"], ["작성된 행 수", 8, "'통계테이블 작성대상' 시트"]], "colors": [null, null, null, null, null, null, null], "total": 7}], "name": "통계테이블_자동작성_예제.xlsx"}</script>
@@ -673,7 +692,7 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink-s
       $("panel-" + k).hidden = !on;
     }
     document.querySelectorAll("[data-tool-link]").forEach((a) => a.classList.toggle("cur", a.dataset.toolLink === key));
-    $("crumb-tool").textContent = NAMES[key];
+    if ($("crumb-tool")) $("crumb-tool").textContent = NAMES[key];
     if (focus) $("tab-" + key).focus();
   }
   document.querySelectorAll(".tooltab").forEach((b) => {
