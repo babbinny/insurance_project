@@ -28,6 +28,6 @@ python -m http.server 8000
 브라우저에서 `http://localhost:8000/web/` 을 엽니다. 처음 열 때 Python 실행 파일(약 40MB)을 인터넷(jsDelivr)에서 받습니다.
 인터넷이 막힌 곳에서는 `web/make_bundle.py` 로 Pyodide 묶음을 `web/pyodide/` 에 만들어 두면 그 파일을 씁니다 (사용법은 파일 맨 위 설명).
 
-회사 로고를 화면 왼쪽 위에 넣으려면 공식 로고 이미지를 `web/logo.png` 로 두면 됩니다 (없으면 글자 제목만 보입니다).
+`web/logo.png` (하나금융그룹 CI의 심볼 마크만 잘라낸 것)가 있으면 처음 화면과 상단바에 그 마크가 보입니다. 파일을 빼면 기본 마크로 돌아갑니다.
 
 웹에서는 PC의 Word를 쓸 수 없어 문서보안(DRM) 파일과 `.doc` 는 읽지 못합니다. 이런 파일은 Spyder에서 실행하세요.
