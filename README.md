@@ -13,6 +13,8 @@ Spyder에서 F5로 띄우던 창과 같은 화면을 웹페이지로 만든 것�
 
 - **약관에서 추출**: 상품 약관(PDF·Word) → 통계테이블 초안 (`benefit_extractor2.py`)
 - **개정 후 자동화**: 기존 통계테이블 + 상품코드 변경 → 개정 후 통계테이블 (`stat_builder.py`).
+- **약관 비교**: 같은 상품의 변경 전·후 약관 → 지급기준표 중심으로 달라진 점 (`policy_compare.py`, Spyder에서도 F5로 실행).
+  예제는 `web/sample/compare_before.docx`, `web/sample/compare_after.docx`
 - **약관 정보**: 상품 약관 → 급부별 지급사유 · 지급금액 · 면책기간 · 적립금 지급 여부 요약 (`benefit_extractor2.py` 의 추출 결과를 화면용으로 정리)
   예제 양식은 `web/sample/sample_revision.xlsx` 입니다 (관계 시트: 주보종명 | 개별상품명 | SP_SPCD | SP_SPCD1).
   변경전·후 시트의 변경후 코드만 작성하고, 주보종을 모르는 행은 '보류_주보종없음' 시트로 보냅니다.

@@ -1020,7 +1020,8 @@ def product_title(text):
     if any(w in t for w in PRODUCT_TITLE_EXCLUDE):
         return None
     core = re.sub(r"\s*약관$", "", t)
-    if not (any(core.endswith(e) for e in PRODUCT_TITLE_ENDINGS)
+    stem = re.sub(r"\s*(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ|Ⅴ|II|III|IV|V)$", "", core)     # 개정 특약의 끝 로마숫자 (예: OO특약Ⅱ)
+    if not (any(stem.endswith(e) for e in PRODUCT_TITLE_ENDINGS)
             or any(re.search(p, t) for p in PRODUCT_TITLE_PATTERNS)):
         return None
     core = re.sub(r"^\s*(?:[\d]+(?:[\-\.]\d+)*\.?|[①-⑳]|[가-하]\.)\s*", "", core)   # 앞 번호 제거

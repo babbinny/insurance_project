@@ -5,6 +5,7 @@
 - 약관에서 추출:        benefit_extractor2.run()   그대로 사용
 - 개정 후 자동화:       stat_builder.build()       그대로 사용
 - 약관 정보:            benefit_extractor2.extract_file() 결과를 급부별 요약으로
+- 약관 비교:            policy_compare.compare()   그대로 사용
 - 결과 엑셀을 화면 미리보기용 JSON 으로도 돌려줍니다 (엑셀의 행 색 표시 포함).
 """
 import json
@@ -13,6 +14,7 @@ import math
 import openpyxl
 
 import benefit_extractor2 as be
+import policy_compare as pc
 import stat_builder as sb
 
 PREVIEW_MAX_ROWS = 2000      # 미리보기에 보여 줄 최대 행 수 (엑셀 파일에는 전부 들어 있음)
@@ -113,3 +115,9 @@ def build_job(in_xlsx, out_dir, log=print):
         if name in wb.sheetnames:
             sheets.append(_sheet(wb[name]))
     return path, json.dumps(sheets, ensure_ascii=False)
+
+
+def compare_job(before, after, out_dir, log=print):
+    """[약관 비교] 실행: 변경 전·후 약관 → 비교 엑셀 + 화면용 JSON. (엑셀 경로, JSON)"""
+    path, result = pc.compare(before, after, out_dir, log)
+    return path, json.dumps(result, ensure_ascii=False, default=str)
