@@ -61,39 +61,47 @@ button, input { font-family: inherit; }
 .state[data-state="fail"] .dot { background: var(--bad); }
 @keyframes pulse { 50% { opacity: 0.25; } }
 
-/* ---------- 소개 영역 + 기능 카드 ---------- */
-.hero { position: relative; overflow: hidden; color: var(--white);
-  background:
-    radial-gradient(900px 380px at 88% -10%, rgba(92, 193, 187, 0.55), transparent 60%),
-    radial-gradient(520px 260px at 6% 120%, rgba(228, 0, 127, 0.16), transparent 60%),
-    linear-gradient(160deg, #00787a 0%, var(--teal) 45%, #0a6e72 100%); }
-.hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.18;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px); background-size: 22px 22px;
-  mask-image: linear-gradient(180deg, #000 0%, transparent 75%); -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%); }
-.hero-in { position: relative; max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 52px 34px; display: grid; gap: 14px; }
-.eyebrow { display: inline-flex; width: fit-content; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em;
-  padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.22); }
-.eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #ff5db1; }
-.hero h1 { font-size: clamp(1.7rem, 3.6vw, 2.55rem); line-height: 1.28; font-weight: 700; }
-.hero-sub { max-width: 60ch; color: rgba(255, 255, 255, 0.86); font-size: 1rem; }
+/* ---------- 상단바: 기능 화면의 탭 메뉴 ---------- */
+.toolnav { display: flex; gap: 2px; padding: 4px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; }
+.toolnav a { padding: 7px 14px; border-radius: 9px; font-size: 0.88rem; font-weight: 500; color: var(--muted); white-space: nowrap; transition: color 0.15s, background 0.15s; }
+.toolnav a:hover { color: var(--teal-700); }
+.toolnav a.cur { background: var(--white); color: var(--teal-700); font-weight: 700; box-shadow: 0 1px 2px rgba(15, 45, 50, 0.08), 0 0 0 1px var(--teal-100); }
+body[data-view="home"] .toolnav, body[data-view="home"] .brand { display: none; }
+body[data-view="home"] .gnb-in { justify-content: flex-end; }
+body[data-view="home"] .gnb { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 
-.tooltabs { margin-top: 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.tooltab { text-align: left; display: flex; gap: 12px; align-items: flex-start; padding: 16px; cursor: pointer;
-  border-radius: var(--r); border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.1); color: var(--white);
-  transition: background 0.18s, transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
-.tooltab:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-2px); }
-.tool-ico { width: 38px; height: 38px; flex: none; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.16); }
-.tool-ico svg { width: 21px; height: 21px; }
-.tool-txt { display: grid; gap: 2px; min-width: 0; }
-.tool-txt b { font-size: 1rem; font-weight: 700; }
-.tool-txt small { font-size: 0.8rem; color: rgba(255, 255, 255, 0.78); line-height: 1.45; }
-.tooltab[aria-selected="true"] { background: var(--white); color: var(--ink); border-color: var(--white); box-shadow: 0 14px 30px -14px rgba(0, 0, 0, 0.45); }
-.tooltab[aria-selected="true"] .tool-ico { background: var(--teal-50); color: var(--teal); }
-.tooltab[aria-selected="true"] .tool-txt small { color: var(--muted); }
+/* ---------- 처음 화면 ---------- */
+.home { min-height: calc(100vh - 62px - 60px); display: grid; place-items: center; padding-inline: 20px; padding-block: 24px 56px;
+  background: radial-gradient(640px 320px at 50% 18%, rgba(0, 132, 133, 0.07), transparent 70%); }
+.home[hidden] { display: none !important; }
+.home-in { width: 100%; max-width: 920px; display: grid; justify-items: center; gap: 14px; text-align: center; }
+.home-mark { width: 60px; height: 60px; border-radius: 18px; position: relative; margin-bottom: 6px;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-300) 100%); box-shadow: 0 14px 30px -14px rgba(0, 132, 133, 0.8); }
+.home-mark::after { content: ""; position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border-radius: 50%; background: var(--pink); border: 3px solid var(--bg); }
+.home-title { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.035em; color: var(--ink); line-height: 1.2; }
+.home-sub { font-size: clamp(0.98rem, 1.8vw, 1.1rem); color: var(--muted); max-width: 46ch; }
+.tiles { margin-top: 26px; width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tile { text-align: left; display: grid; gap: 14px; align-content: start; padding: 20px 18px 18px; cursor: pointer;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--white); color: var(--ink); box-shadow: var(--shadow-sm);
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.tile:hover { transform: translateY(-3px); border-color: var(--teal-100); box-shadow: var(--shadow); }
+.tile:hover .tool-ico { background: var(--teal); color: var(--white); }
+.tool-ico { width: 42px; height: 42px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--teal-50); color: var(--teal); transition: background 0.18s, color 0.18s; }
+.tool-ico svg { width: 22px; height: 22px; }
+.tool-txt { display: grid; gap: 4px; min-width: 0; }
+.tool-txt b { font-size: 1.02rem; font-weight: 700; }
+.tool-txt small { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+.home-note { margin-top: 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.home-note::before { content: ""; width: 14px; height: 14px; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.tool-title { font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 700; color: var(--ink); letter-spacing: -0.03em; }
+.tool-title::before { content: ""; display: block; width: 28px; height: 4px; border-radius: 2px; background: var(--teal); margin-bottom: 14px; }
 
 /* ---------- 본문 ---------- */
 .main { max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 30px 64px; }
-.panel { display: grid; gap: 22px; }
+.panel { display: grid; gap: 20px; }
+.panel > .lead { margin-top: -8px; }
 .panel[hidden] { display: none !important; }
 .lead { font-size: 1.08rem; color: var(--ink-2); max-width: 70ch; }
 .lead b { color: var(--teal-700); font-weight: 700; }
@@ -265,15 +273,20 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
 
 /* ---------- 좁은 화면 ---------- */
 @media (max-width: 960px) {
-  .tooltabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gnb-in { gap: 10px; }
+  .brand > span:last-child { display: none; }
   .steps { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
-  .gnb-in, .hero-in, .main, .foot-in { padding-inline: 16px; }
-  .hero-in { padding-block: 34px 24px; }
-  .tooltab { padding: 12px; gap: 10px; }
-  .tool-ico { width: 32px; height: 32px; }
+  .gnb-in, .main, .foot-in { padding-inline: 16px; }
+  .home { padding-inline: 16px; }
+  .tile { padding: 14px; gap: 10px; }
+  .tool-ico { width: 36px; height: 36px; }
   .tool-txt small { display: none; }
+  .toolnav a { padding: 6px 10px; font-size: 0.82rem; }
+  .gnb-in { height: auto; min-height: 58px; flex-wrap: wrap; padding-block: 8px; }
+  body[data-view="tool"] .toolnav { order: 3; width: 100%; }
   .form { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 16px 16px 4px; }
   .form .k { margin-top: 6px; }
   .band, .bar { padding-inline: 16px; }
@@ -285,42 +298,51 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .dot { animation: none !important; }
-  .tooltab, button { transition: none; }
-  .tooltab:hover, button.primary:hover:not(:disabled) { transform: none; }
+  .tile, button { transition: none; }
+  .tile:hover, button.primary:hover:not(:disabled) { transform: none; }
 }
 </style>
 <header class="gnb">
   <div class="gnb-in">
-    <a class="brand" href="#extract"><span id="logo-slot"></span><span class="brand-mark" aria-hidden="true"></span><span>통계테이블 작성 도구</span></a>
+    <a class="brand" href="#" id="brand-home" aria-label="처음 화면으로"><span id="logo-slot"></span><span class="brand-mark" aria-hidden="true"></span><span>통계테이블 작성 도구</span></a>
+    <nav class="toolnav" aria-label="기능">
+      <a href="#extract" data-tool-link="extract">약관에서 추출</a>
+      <a href="#revise" data-tool-link="revise">개정 후 자동화</a>
+      <a href="#info" data-tool-link="info">약관 정보</a>
+      <a href="#compare" data-tool-link="compare">약관 비교</a>
+    </nav>
     <div class="state" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">준비 중</span></div>
   </div>
 </header>
 
-<section class="hero">
-  <div class="hero-in">
-    <p class="eyebrow">보험 약관 업무도구</p>
-    <h1>약관에서 통계테이블까지,<br>한 화면에서 끝냅니다.</h1>
-    <p class="hero-sub">PDF·Word 약관을 올리면 지급기준표를 읽어 초안을 만들고, 개정 · 요약 · 비교까지 도와드립니다. 파일은 이 PC 밖으로 나가지 않습니다.</p>
-    <div class="tooltabs" role="tablist" aria-label="기능 선택">
-        <button type="button" class="tooltab" role="tab" id="tab-extract" data-tool="extract" aria-controls="panel-extract">
+<section class="home" id="home" aria-label="처음 화면">
+  <div class="home-in">
+    <span class="home-mark" aria-hidden="true"></span>
+    <h1 class="home-title">통계테이블 작성 도구</h1>
+    <p class="home-sub">약관 PDF·Word만 올리면 통계테이블 초안부터 개정 · 요약 · 비교까지 한 번에 끝냅니다.</p>
+    <div class="tiles" aria-label="기능 선택">
+        <button type="button" class="tooltab tile" id="tab-extract" data-tool="extract" aria-controls="panel-extract">
           <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4"/></svg></span><span class="tool-txt"><b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small></span>
         </button>
-        <button type="button" class="tooltab" role="tab" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
+        <button type="button" class="tooltab tile" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
           <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg></span><span class="tool-txt"><b>개정 후 자동화</b><small>기존 테이블 + 코드 변경 → 개정 후 테이블</small></span>
         </button>
-        <button type="button" class="tooltab" role="tab" id="tab-info" data-tool="info" aria-controls="panel-info">
+        <button type="button" class="tooltab tile" id="tab-info" data-tool="info" aria-controls="panel-info">
           <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/></svg></span><span class="tool-txt"><b>약관 정보</b><small>급부별 보험금 · 면책 · 적립금 요약</small></span>
         </button>
-        <button type="button" class="tooltab" role="tab" id="tab-compare" data-tool="compare" aria-controls="panel-compare">
+        <button type="button" class="tooltab tile" id="tab-compare" data-tool="compare" aria-controls="panel-compare">
           <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.8"/><path d="M5.5 9h2.5M5.5 12.5h2.5M16 9h2.5M16 12.5h2.5"/></svg></span><span class="tool-txt"><b>약관 비교</b><small>변경 전·후 약관의 달라진 점</small></span>
         </button>
-      </div>
+    </div>
+    <p class="home-note">파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</p>
   </div>
 </section>
 
+<div id="app" hidden>
 <main class="main">
       <!-- ===================== 약관에서 추출 ===================== -->
-      <div class="panel" id="panel-extract" role="tabpanel" aria-labelledby="tab-extract">
+      <div class="panel" id="panel-extract" aria-label="약관에서 추출">
+        <h1 class="tool-title">약관에서 추출</h1>
         <p class="lead">상품 약관에서 보험금 지급기준표를 찾아 <b>통계테이블 초안 엑셀</b>을 만들어 드립니다.</p>
         <div class="steps">
           <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
@@ -383,7 +405,8 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
       </div>
 
       <!-- ===================== 개정 후 자동화 ===================== -->
-      <div class="panel" id="panel-revise" role="tabpanel" aria-labelledby="tab-revise" hidden>
+      <div class="panel" id="panel-revise" aria-label="개정 후 자동화" hidden>
+        <h1 class="tool-title">개정 후 자동화</h1>
         <p class="lead">개정 전 통계테이블을 바탕으로, 상품코드만 바뀐 상품의 <b>개정 후 통계테이블</b>을 자동으로 채웁니다.</p>
         <div class="steps">
           <div class="step"><span class="no">STEP 1</span><h3>양식 엑셀 준비</h3>
@@ -440,7 +463,8 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
       </div>
 
       <!-- ===================== 약관 정보 ===================== -->
-      <div class="panel" id="panel-info" role="tabpanel" aria-labelledby="tab-info" hidden>
+      <div class="panel" id="panel-info" aria-label="약관 정보" hidden>
+        <h1 class="tool-title">약관 정보</h1>
         <p class="lead">약관을 올리면 <b>급부마다 언제, 얼마를 지급하는지</b>와 면책기간, 적립금 지급 여부를 한눈에 정리해 드립니다.</p>
         <div class="steps">
           <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
@@ -498,7 +522,8 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
       </div>
 
       <!-- ===================== 약관 비교 ===================== -->
-      <div class="panel" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+      <div class="panel" id="panel-compare" aria-label="약관 비교" hidden>
+        <h1 class="tool-title">약관 비교</h1>
         <p class="lead">같은 상품의 <b>변경 전</b> 약관과 <b>변경 후</b> 약관을 올리면, 지급기준표를 중심으로 달라진 점을 정리해 드립니다.</p>
         <div class="steps">
           <div class="step"><span class="no">STEP 1</span><h3>약관 두 개 준비</h3>
@@ -561,6 +586,7 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
         </section>
       </div>
 </main>
+</div>
 
 <footer class="foot">
   <div class="foot-in">
@@ -687,31 +713,27 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
     current = key;
     for (const k of Object.keys(TOOLS)) {
       const on = k === key;
-      $("tab-" + k).setAttribute("aria-selected", String(on));
-      $("tab-" + k).tabIndex = on ? 0 : -1;
       $("panel-" + k).hidden = !on;
     }
-    document.querySelectorAll("[data-tool-link]").forEach((a) => a.classList.toggle("cur", a.dataset.toolLink === key));
-    if ($("crumb-tool")) $("crumb-tool").textContent = NAMES[key];
-    if (focus) $("tab-" + key).focus();
-  }
-  document.querySelectorAll(".tooltab").forEach((b) => {
-    b.addEventListener("click", () => { selectTool(b.dataset.tool); history.replaceState(null, "", "#" + b.dataset.tool); });
-    b.addEventListener("keydown", (e) => {
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      const i = ORDER.indexOf(current) + (e.key === "ArrowRight" ? 1 : -1);
-      const next = ORDER[(i + ORDER.length) % ORDER.length];
-      selectTool(next, true);
-      history.replaceState(null, "", "#" + next);
+    document.querySelectorAll("[data-tool-link]").forEach((a) => {
+      a.classList.toggle("cur", a.dataset.toolLink === key);
+      if (a.dataset.toolLink === key) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
-  });
-  document.querySelectorAll("[data-tool-link]").forEach((a) => a.addEventListener("click", (e) => {
-    e.preventDefault();
-    selectTool(a.dataset.toolLink);
-    history.replaceState(null, "", "#" + a.dataset.toolLink);
-    $("tab-" + a.dataset.toolLink).scrollIntoView({ block: "nearest" });
-  }));
-  window.addEventListener("hashchange", () => selectTool(location.hash.slice(1)));
+    if ($("crumb-tool")) $("crumb-tool").textContent = NAMES[key];
+
+  }
+  // ---------- 처음 화면 ↔ 기능 화면 (주소의 #extract 등으로 구분, 뒤로 가기 = 처음 화면) ----------
+  function route() {
+    const key = location.hash.slice(1);
+    const inTool = !!TOOLS[key];
+    $("home").hidden = inTool;
+    $("app").hidden = !inTool;
+    document.body.dataset.view = inTool ? "tool" : "home";
+    if (inTool) selectTool(key);
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll(".tile").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.tool; }));
+  window.addEventListener("hashchange", route);
 
   // ---------- 실행 엔진 (브라우저 안 Python) ----------
   function startWorker() {
@@ -1332,7 +1354,7 @@ details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink);
       else setResult(t, { name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
     } catch (e) {}
   }
-  selectTool(location.hash.slice(1));
+  route();
   refreshButtons();
   startWorker();
 
