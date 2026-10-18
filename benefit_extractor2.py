@@ -122,7 +122,26 @@ PRODUCT_TITLE_EXCLUDE = ["이 특약", "이특약", "합니다", "됩니다", "�
 # 급부코드 매핑 엑셀(선택): 첫 번째 열 = 급부코드, 두 번째 열 = 급부코드명
 # 급부명 비교 시 끝에서 떼어낼 표현 (예: 치료비 ↔ 치료)
 NAME_SUFFIXES = ["보험금", "급여금", "지원금", "자금", "비", "금"]
-MATCH_WARN_SCORE = 0.75     # 이 점수 미만이면 '확인필요'
+
+# 급부코드표: 칼럼명으로 찾음 (모든 시트, 위에서 15행 안에서 칼럼명 행을 찾음)
+CODE_ID_COLS = ["CD_ID", "급부코드", "SCRP_RISK_PRM_CODE"]
+CODE_NM_COLS = ["CD_NM", "급부코드명", "급부명"]
+
+# 급부 매칭
+#   1) 급부명 전체가 급부코드명과 거의 같으면(NAME_DIRECT_SCORE 이상) 그 코드 하나
+#   2) 아니면 지급사유에 나온 질병명(약관의 "‘OO’이라 함은" 정의 + 급부코드명에 있는 질병명)마다
+#      '질병명 + 행위(진단/수술…)' 로 급부코드를 찾음 → 질병명이 여러 개면 급부코드도 여러 개(행도 여러 개)
+#   3) 그래도 없으면 급부명과 가장 비슷한 코드 (확인필요)
+NAME_DIRECT_SCORE = 0.88
+MATCH_OK_SCORE = 0.85        # 이 점수 이상이면 정상, 미만이면 '확인필요'
+MATCH_MIN_SCORE = 0.60       # 이 점수 미만이면 코드를 넣지 않음
+# 약관 용어 → 급부코드표 용어 (예: 약관의 '암' = 급부코드표의 '일반암')
+TERM_ALIAS = {"암": "일반암"}
+# 급부의 '행위' (급부명에서 먼저 찾고, 없으면 지급사유에서 찾음)
+ACTION_WORDS = ["진단", "수술", "입원", "통원", "치료", "사망", "장해", "항암", "방사선", "약물", "검사",
+                "간병", "요양", "골절", "화상", "생존", "중도", "만기"]
+# 질병명으로 볼 용어의 끝 글자 (약관 정의에서 '청약일로부터…' 같은 일반 용어를 거르기 위함)
+DISEASE_ENDINGS = ["암", "종양", "증", "혈", "질환", "질병", "병", "치매", "경색", "출혈", "골절", "화상", "장해", "결석"]
 
 # =====================================================================
 # Word(.docx) 읽기 - 추가 설치 없이 zip/XML 로 직접 읽음
@@ -795,7 +814,9 @@ def get_pay_term(text):
 
 
 def norm_benefit(s):
-    s = nospace(re.sub(r"[\(\[].*?[\)\]]", "", s))
+    """급부명 비교용: 괄호·공백·로마숫자·끝의 '자금/비/금' 등 제거"""
+    s = nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", s or ""))
+    s = re.sub(r"(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ|Ⅴ|II|III|IV)+$", "", s)
     for suf in NAME_SUFFIXES:
         if s.endswith(suf) and len(s) > len(suf) + 1:
             s = s[: -len(suf)]
@@ -803,23 +824,185 @@ def norm_benefit(s):
     return s
 
 
+def actions_in(text):
+    t = nospace(text)
+    return [a for a in ACTION_WORDS if a in t]
+
+
+def disease_part(name_n):
+    """급부코드명(정리된 것)에서 행위어를 뺀 질병 부분. 예) 기타피부암진단 → 기타피부암"""
+    d = name_n
+    for a in sorted(ACTION_WORDS, key=len, reverse=True):
+        d = d.replace(a, "")
+    return d
+
+
+def _find_col_name(header, cands):
+    hs = [nospace(str(h)).upper() if h is not None else "" for h in header]
+    for c in cands:
+        if c.upper() in hs:
+            return hs.index(c.upper())
+    return None
+
+
 def load_code_table(path):
+    """급부코드표 읽기: 'CD_ID'(급부코드) / 'CD_NM'(급부명) 칼럼을 이름으로 찾음"""
     if not path:
         return None
-    df = pd.read_excel(path, dtype=str).iloc[:, :2]
-    df.columns = ["급부코드", "급부코드명"]
-    df = df.dropna(subset=["급부코드명"])
-    df["_n"] = df["급부코드명"].map(norm_benefit)
-    return df
+    if path.lower().endswith(".csv"):
+        try:
+            sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="utf-8-sig")}
+        except UnicodeDecodeError:
+            sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="cp949")}
+    else:
+        sheets = pd.read_excel(path, header=None, dtype=str, sheet_name=None)
+    for sname, raw in sheets.items():
+        for hr in range(min(15, len(raw))):
+            header = list(raw.iloc[hr])
+            ci, ni = _find_col_name(header, CODE_ID_COLS), _find_col_name(header, CODE_NM_COLS)
+            if ci is None or ni is None:
+                continue
+            df = raw.iloc[hr + 1:, [ci, ni]].copy()
+            df.columns = ["급부코드", "급부코드명"]
+            df["급부코드"] = df["급부코드"].fillna("").map(lambda v: str(v).strip())
+            df["급부코드명"] = df["급부코드명"].fillna("").map(lambda v: clean(str(v)))
+            df = df[(df["급부코드"] != "") & (df["급부코드명"] != "")].drop_duplicates("급부코드")
+            df["_n"] = df["급부코드명"].map(norm_benefit)
+            df["_d"] = df["_n"].map(disease_part)
+            df["_a"] = df["급부코드명"].map(actions_in)
+            return df.reset_index(drop=True)
+    raise RuntimeError(f"급부코드표에서 칼럼명 {CODE_ID_COLS[0]} / {CODE_NM_COLS[0]} 을(를) 찾지 못했습니다.")
 
 
-def match_code(name, codes):
-    if codes is None or codes.empty:
-        return "", "", None
+def defined_terms(whole):
+    """약관 전체에서 "‘OO’이라 함은" 으로 정의된 질병 용어 모으기"""
+    terms = set()
+    for m in re.finditer(r"[‘'“\"「]([^’'”\"」]{1,20})[’'”\"」]\s*(?:이라|라)\s*함은", whole):
+        t = clean(m.group(1))
+        if any(nospace(t).endswith(e) for e in DISEASE_ENDINGS) and not re.search(r"\d|기간|동안|나이", t):
+            terms.add(t)
+    return terms
+
+
+def known_terms(whole, codes):
+    """지급사유에서 찾을 질병 용어 = 약관 정의 용어 + 급부코드명의 질병 부분"""
+    terms = {nospace(t) for t in defined_terms(whole)}
+    if codes is not None:
+        terms |= {d for d in codes["_d"] if len(d) >= 2 and any(d.endswith(e) for e in DISEASE_ENDINGS)}
+    terms |= set(TERM_ALIAS)
+    return sorted(terms, key=len, reverse=True)
+
+
+def terms_in_reason(reason, terms):
+    """지급사유에 나온 질병 용어(긴 것 우선, 겹치지 않게). '(…제외)' 안과 'OO보장개시일' 은 제외"""
+    t = re.sub(r"\([^()]*제외[^()]*\)", " ", reason)
+    t = re.sub(r"\S*보장\s*개시일", " ", t)
+    quoted = {nospace(q) for q in re.findall(r"[‘'“\"「]([^’'”\"」]{1,20})[’'”\"」]", t)
+              if any(nospace(q).endswith(e) for e in DISEASE_ENDINGS)}
+    terms = sorted(set(terms) | quoted, key=len, reverse=True)
+    used, found = [False] * len(t), []
+    for term in terms:
+        pat = r"\s*".join(map(re.escape, term))
+        for m in re.finditer(pat, t):
+            s0, e0 = m.span()
+            if any(used[s0:e0]):
+                continue
+            if len(term) <= 2 and s0 > 0 and re.match(r"[가-힣]", t[s0 - 1]):   # '암'은 단어 시작일 때만
+                continue
+            for k in range(s0, e0):
+                used[k] = True
+            found.append((s0, term))
+    found.sort()
+    out = []
+    for _, term in found:
+        if term not in out:
+            out.append(term)
+    return out
+
+
+def _score(term, acts, row):
+    """질병 용어 + 행위어 ↔ 급부코드명 점수 (0~1)"""
+    t = TERM_ALIAS.get(term, term)
+    d = row["_d"]
+    if not d:
+        s = 0.0
+    elif t == d:
+        s = 0.6
+    elif d in t or t in d:
+        s = 0.35 + 0.2 * min(len(d), len(t)) / max(len(d), len(t))
+    else:
+        s = 0.45 * difflib.SequenceMatcher(None, t, d).ratio()
+    ca = row["_a"]
+    if acts:
+        hit = len([a for a in acts if a in ca]) / len(acts)
+        s += 0.4 * hit if hit else (-0.1 if ca else 0.1)
+    else:
+        s += 0.2 if not ca else 0.1
+    return s
+
+
+def names_without_codes(name, reason, terms):
+    """급부체계(급부코드표)가 없을 때: 약관 기준 급부명 만들기 → [("", 약관급부명, None, 근거)]
+    - 지급사유에 질병명이 2개 이상 → 질병명마다 '질병명 + 행위' (예: 기타피부암 진단, 제자리암 진단)
+    - 질병명이 1개이고 급부명에 들어 있거나, 질병명이 없으면 → 급부명 그대로 (예: 고액암진단)
+    - 질병명이 1개인데 급부명에 없으면 → '질병명 + 행위' (예: 암진단비 → 일반암 진단)"""
     n = norm_benefit(name)
-    scores = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio())
-    i = scores.idxmax()
-    return codes.at[i, "급부코드"], codes.at[i, "급부코드명"], round(float(scores[i]), 2)
+    acts = actions_in(name) or actions_in(reason)
+    act = acts[0] if acts else ""
+    found = terms_in_reason(reason, terms)
+
+    def label(term):
+        t = TERM_ALIAS.get(term, term)
+        return f"{t} {act}".strip()
+
+    if len(found) >= 2:
+        return [("", label(t), None, f"지급사유 질병명: {t}") for t in found]
+    if len(found) == 1 and (found[0] not in n or found[0] in TERM_ALIAS):
+        return [("", label(found[0]), None, f"지급사유 질병명: {found[0]}")]
+    return [("", display_name(name), None, "약관 급부명")]
+
+
+def display_name(name):
+    """표시용 급부명: 괄호·공백 제거, 끝의 '자금/비/금'은 앞이 행위어(진단·수술…)일 때만 뗌
+    예) 고액암진단자금 → 고액암진단, 건강관리자금 → 건강관리자금"""
+    s = nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", name or ""))
+    for suf in NAME_SUFFIXES:
+        if s.endswith(suf) and any(s[: -len(suf)].endswith(a) for a in ACTION_WORDS):
+            return s[: -len(suf)]
+    return s
+
+
+def match_codes(name, reason, codes, terms):
+    """급부 1개 → [(급부코드, 급부코드명, 점수, 근거)] (여러 개일 수 있음)"""
+    if codes is None or codes.empty:
+        return names_without_codes(name, reason, terms)
+    n = norm_benefit(name)
+    # 1) 급부명 전체가 거의 같은 코드
+    ratios = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio())
+    i = ratios.idxmax()
+    if ratios[i] >= NAME_DIRECT_SCORE:
+        return [(codes.at[i, "급부코드"], codes.at[i, "급부코드명"], round(float(ratios[i]), 2), "급부명 일치")]
+    # 2) 지급사유의 질병 용어마다
+    acts = actions_in(name) or actions_in(reason)
+    found = terms_in_reason(reason, terms)
+    out = []
+    for term in found:
+        sc = codes.apply(lambda r: _score(term, acts, r), axis=1)
+        j = sc.idxmax()
+        if sc[j] >= MATCH_MIN_SCORE:
+            out.append((codes.at[j, "급부코드"], codes.at[j, "급부코드명"], round(float(sc[j]), 2),
+                        f"지급사유 질병명: {term}"))
+        else:
+            out.append(("", "", round(float(sc[j]), 2), f"지급사유 질병명: {term} (맞는 코드 없음)"))
+    if any(c for c, *_ in out):
+        return out
+    # 3) 급부명과 가장 비슷한 코드
+    d = disease_part(n)
+    sc = codes.apply(lambda r: max(_score(d, acts, r), difflib.SequenceMatcher(None, n, r["_n"]).ratio()), axis=1)
+    j = sc.idxmax()
+    if sc[j] >= MATCH_MIN_SCORE:
+        return [(codes.at[j, "급부코드"], codes.at[j, "급부코드명"], round(float(sc[j]), 2), "급부명 유사")]
+    return out or [("", "", round(float(sc[j]), 2), "맞는 코드 없음")]
 
 
 # =====================================================================
@@ -866,6 +1049,7 @@ def _only_page_noise(blocks, a, b):
 def extract_file(path, codes, log, word_reader):
     blocks, how = read_any(path, word_reader, log)
     whole = "\n".join(b[1] for b in blocks if b[0] == "p")
+    terms = known_terms(whole, codes)          # 지급사유에서 찾을 질병 용어 (약관 정의 + 급부코드명)
 
     # 1) 지급기준표 모으기 (다음 쪽으로 이어진 표는 하나로 합침)
     file_product = os.path.splitext(os.path.basename(path))[0]
@@ -953,7 +1137,7 @@ def extract_file(path, codes, log, word_reader):
             if base is None and find_money(amount):     # 표 근처에 없으면 특약 본문에서 '기준' 문구 찾기
                 base, base_src = find_base_amount(section.split("\n") + notes.split("\n"))
             benefits.append(parse_benefit(path, g["product"], g["title"], name, reason, amount,
-                                          notes, section, whole, codes, base, base_src, g["near"]))
+                                          notes, section, whole, codes, base, base_src, g["near"], terms))
 
     tag = {"Word": " (Word로 읽음)", "PDF": " (PDF)"}.get(how, "")
     n_prod = len({g["product"] for g in groups})
@@ -962,7 +1146,7 @@ def extract_file(path, codes, log, word_reader):
 
 
 def parse_benefit(path, product, title, raw_name, reason, amount, notes, section, whole, codes,
-                  base=None, base_src="", near=()):
+                  base=None, base_src="", near=(), terms=None):
     name, article = split_name(raw_name)
     both = reason + " " + amount
     memo = []
@@ -989,16 +1173,26 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
     once, once_src = get_once_flag(name, both)
     if once is None:
         memo.append(f"적립금 지급여부 확인({once_src})")
-    code, code_name, score = match_code(name, codes)
-    if score is not None and score < MATCH_WARN_SCORE:
-        memo.append(f"급부코드 매칭 낮음({score})")
+    matches = match_codes(name, reason, codes, terms or [])
+    for c, cn, sc, why in matches:
+        if codes is None:
+            break
+        if not c:
+            memo.append(f"급부코드 못 찾음({why})")
+        elif sc < MATCH_OK_SCORE:
+            memo.append(f"급부코드 매칭 확인({cn}, {sc})")
     if red_years and "갱신" in notes and "감액" in notes:
         memo.append("감액: 갱신계약 미적용 문구 있음(갱신형 확인)")
 
     return {
         "파일명": os.path.basename(path), "특약명": product, "별표명": title,
         "급부명": name, "조항": article,
-        "급부코드": code, "급부코드명": code_name, "매칭점수": score,
+        "급부코드": ", ".join(c for c, *_ in matches if c),
+        "급부코드명": ", ".join(cn for c, cn, *_ in matches if c),
+        "약관급부명": ", ".join(cn for c, cn, *_ in matches if not c and cn),
+        "매칭점수": ", ".join(str(sc) for c, cn, sc, _ in matches if c),
+        "매칭근거": " / ".join(w for *_, w in matches),
+        "_matches": matches,
         "납입주기": get_pay_cycle(amount),
         "산출기준": basis, "기본지급율": rate, "지급주기": pay_term, "기준금액(원)": base, "근거_기준금액": base_src,
         "감액기간(년)": red_years, "감액비율": red_ratio, "감액방식": red_mode,
@@ -1021,12 +1215,16 @@ def expand_rows(b):
     else:
         segs = [(0, END_MONTH, rate)]
     out = []
-    for i, (s, e, r) in enumerate(segs):
-        row = dict(base)
-        row.update({"경과년1": s, "경과년2": e, "지급율": r, "확인필요": b["확인필요"]})
-        if i > 0:
-            row["면책기간"] = 0      # 면책은 첫 경과 구간(예: 0~12)에만. 이후 구간은 이미 면책기간이 지남
-        out.append(row)
+    matches = [m for m in b.get("_matches") or [] if m[0] or m[1]] or [("", "", None, "")]
+    for code, code_name, score, why in matches:      # 급부코드(또는 약관급부명)가 여러 개면 그만큼 행을 만듦
+        for i, (s, e, r) in enumerate(segs):
+            row = dict(base)
+            row.update({"급부코드": code, "급부코드명": code_name if code else "",
+                        "약관급부명": "" if code else code_name, "매칭점수": score, "매칭근거": why,
+                        "경과년1": s, "경과년2": e, "지급율": r, "확인필요": b["확인필요"]})
+            if i > 0:
+                row["면책기간"] = 0      # 면책은 첫 경과 구간(예: 0~12)에만. 이후 구간은 이미 면책기간이 지남
+            out.append(row)
     return out
 
 
@@ -1079,14 +1277,20 @@ def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
     finally:
         reader.quit()       # 뒤에서 연 Word 닫기
 
-    draft_cols = ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명", "산출기준", "지급율", "지급주기",
-                  "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"]
+    draft_cols = ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "매칭근거",
+                  "산출기준", "지급율", "지급주기", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"]
     draft = pd.DataFrame([r for b in benefits for r in expand_rows(b)], columns=draft_cols)
     if codes is None:
-        draft = draft.drop(columns=["급부코드", "급부코드명"])
+        draft.insert(draft.columns.get_loc("급부코드"), "약관급부명",
+                     [r.get("약관급부명", "") for b in benefits for r in expand_rows(b)])
+        draft = draft.drop(columns=["급부코드", "급부코드명", "매칭점수"])
     for c in ["적립금지급여부", "면책기간", "경과년1", "경과년2"]:   # 1.0 → 1 로 표시
         draft[c] = pd.to_numeric(draft[c], errors="coerce").astype("Int64")
-    raw = pd.DataFrame(benefits)
+    raw = pd.DataFrame(benefits).drop(columns=["_matches"], errors="ignore")
+    if codes is None:
+        raw = raw.drop(columns=["급부코드", "급부코드명", "매칭점수"], errors="ignore")
+    else:
+        raw = raw.drop(columns=["약관급부명"], errors="ignore")
     stat = pd.DataFrame(status)
     if len(raw):
         prod = (raw.assign(_chk=raw["확인필요"] != "")
@@ -1166,7 +1370,7 @@ def run_gui():
                 v_out.set(os.path.dirname(f))
 
     word_t = [("Word/PDF", "*.docx *.doc *.docm *.pdf")]
-    xl_t = [("Excel", "*.xlsx *.xls")]
+    xl_t = [("Excel/CSV", "*.xlsx *.xls *.csv")]
     items = [
         ("약관 폴더/파일", v_src, [("폴더", lambda: pick_dir(v_src)), ("파일", lambda: pick_file(v_src, word_t))]),
         ("급부코드표(선택)", v_code, [("파일", lambda: pick_file(v_code, xl_t))]),
