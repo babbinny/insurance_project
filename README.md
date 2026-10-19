@@ -31,3 +31,17 @@ python -m http.server 8000
 `web/logo.png` (하나금융그룹 CI의 심볼 마크만 잘라낸 것)가 있으면 처음 화면과 상단바에 그 마크가 보입니다. 파일을 빼면 기본 마크로 돌아갑니다.
 
 웹에서는 PC의 Word를 쓸 수 없어 문서보안(DRM) 파일과 `.doc` 는 읽지 못합니다. 이런 파일은 Spyder에서 실행하세요.
+
+
+## 내부망 Spyder에서 쓰기
+
+네 파일을 **같은 폴더**에 두고, 쓰려는 기능의 파일을 Spyder에서 열어 F5로 실행하면 창이 뜹니다.
+
+| 웹사이트 탭 | 파일 | 필요한 파일 |
+|---|---|---|
+| 약관 정보 | `policy_info.py` | `benefit_extractor2.py` |
+| 약관 비교 | `policy_compare.py` | `benefit_extractor2.py` |
+| 약관에서 추출 | `benefit_extractor2.py` | – |
+| 개정 후 자동화 | `stat_builder.py` | – |
+
+pandas · openpyxl 은 Anaconda에 들어 있습니다. PDF 약관을 읽으려면 pdfplumber 가 필요합니다 (`pip install pdfplumber`).
