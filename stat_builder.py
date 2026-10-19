@@ -21,16 +21,21 @@
     [검토_상품코드] 개별상품코드별 처리 상태 (기존 행 없음, 신규 등은 색 표시)
     [검토_요약]     상태별 건수
 
+- 문서보안(DRM)이 걸린 엑셀이나 구버전(.xls) 파일은 PC의 Excel을 화면에 안 보이게 열어서 값만 읽습니다.
+  (이때 결과 파일에는 양식의 색·서식이 빠지고 값만 들어갑니다)
+
 Spyder 에서 F5 로 실행하면 창이 뜹니다. (추가 설치 필요 없음)
 """
 import os
 import queue
+import zipfile
 import datetime
 import threading
 from collections import OrderedDict
 
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment
+from openpyxl.utils.exceptions import InvalidFileException
 
 # =====================================================================
 # 설정
@@ -92,13 +97,86 @@ def extra_cols(all_cols, used):
     return {n: c for n, c in all_cols.items() if n not in used}
 
 
+# ---------------------------------------------------------------------
+# Excel 프로그램으로 읽기 (문서보안(DRM) 파일, .xls 파일용)
+#   파이썬이 직접 못 여는 파일은 PC의 Excel을 화면에 안 보이게 열어서 시트별 값만 읽음
+# ---------------------------------------------------------------------
+
+
+def _com_value(v):
+    if isinstance(v, float) and v.is_integer():
+        return int(v)              # Excel 숫자 1.0 → 1
+    return v
+
+
+def read_with_excel(path):
+    """PC의 Excel로 열어 시트별 값만 읽어 openpyxl 통합문서로 만듦 (시트 순서·이름·셀 위치 그대로, 서식 제외)"""
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError:
+        raise RuntimeError("일반 엑셀(.xlsx) 형식이 아니고(문서보안/구버전 .xls 의심), win32com 이 없어 Excel로도 읽지 못했습니다.")
+    pythoncom.CoInitialize()          # 실행 버튼 작업(별도 스레드)에서 Excel을 쓰려면 필요
+    app = None
+    try:
+        app = win32com.client.DispatchEx("Excel.Application")
+        app.Visible = False
+        app.DisplayAlerts = False
+        xb = app.Workbooks.Open(os.path.abspath(path), UpdateLinks=0, ReadOnly=True)
+        try:
+            wb = openpyxl.Workbook()
+            wb.remove(wb.active)
+            for xs in xb.Worksheets:
+                ws = wb.create_sheet(title=str(xs.Name)[:31])
+                used = xs.UsedRange
+                vals = used.Value2            # 날짜 등도 숫자 그대로 (형식 변환 없이)
+                if vals is None:
+                    continue
+                if not isinstance(vals, tuple):
+                    vals = ((vals,),)        # 셀 하나만 있는 시트
+                r0, c0 = used.Row, used.Column
+                for i, row in enumerate(vals):
+                    for j, v in enumerate(row):
+                        if v is not None and v != "":
+                            ws.cell(r0 + i, c0 + j).value = _com_value(v)
+        finally:
+            xb.Close(False)
+        return wb
+    finally:
+        if app is not None:
+            try:
+                app.Quit()
+            except Exception:
+                pass
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+def load_input(path, log=print):
+    """일반 .xlsx 는 바로 열고, 안 되면(문서보안/.xls) Excel 프로그램으로 값만 읽음"""
+    try:
+        return openpyxl.load_workbook(path)
+    except (zipfile.BadZipFile, InvalidFileException):
+        log("  (참고) 일반 엑셀 형식이 아닙니다(문서보안/구버전 .xls 의심). PC의 Excel로 열어 값만 읽습니다.")
+    try:
+        wb = read_with_excel(path)
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"Excel로 열기 실패: {e}")
+    log("  Excel로 읽음 → 결과 파일에는 양식의 색·서식이 빠지고 값만 들어갑니다.")
+    return wb
+
+
 # =====================================================================
 # 핵심 처리
 # =====================================================================
 
 
 def build(in_path, out_dir, log=print):
-    wb = openpyxl.load_workbook(in_path)
+    wb = load_input(in_path, log)
     if len(wb.worksheets) < 4:
         raise RuntimeError("시트가 4개 이상 있어야 합니다 (작성대상, 기존, 관계, 변경전후).")
     ws_t, ws_o = wb.worksheets[SHEET_TARGET], wb.worksheets[SHEET_OLD]
@@ -337,7 +415,7 @@ def run_gui():
     q = queue.Queue()
 
     def pick_in():
-        f = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm")])
+        f = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx *.xlsm *.xls")])
         if f:
             v_in.set(f)
             if not v_out.get():
