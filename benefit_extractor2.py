@@ -138,6 +138,14 @@ MATCH_OK_SCORE = 0.85        # 이 점수 이상이면 정상, 미만이면 '확
 MATCH_MIN_SCORE = 0.60       # 이 점수 미만이면 코드를 넣지 않음
 # 약관 용어 → 급부코드표 용어 (예: 약관의 '암' = 급부코드표의 '일반암')
 TERM_ALIAS = {"암": "일반암"}
+# 비교할 때 무시할 말 (예: 약관 '3대주요암' = 급부코드표 '3대암')
+TERM_IGNORE_WORDS = ["주요"]
+# 급부코드명 괄호 안의 말
+#   - 질병명 목록 (예: 3대암(위암,폐암,간암)진단): 지급사유에 나오면 그 코드에 가산점
+#   - 그 밖의 구분어 (예: 암진단(간병비)): 급부명·지급사유에 없으면 그 코드에 감점 → 일반 '암진단비'가 간병비 코드로 가지 않게
+PAREN_MISS_PENALTY = 0.35
+PAREN_DISEASE_BONUS = 0.1      # 질병명 하나당 (최대 PAREN_DISEASE_BONUS_MAX)
+PAREN_DISEASE_BONUS_MAX = 0.2
 # 급부의 '행위' (급부명에서 먼저 찾고, 없으면 지급사유에서 찾음)
 ACTION_WORDS = ["진단", "수술", "입원", "통원", "치료", "사망", "장해", "항암", "방사선", "약물", "검사",
                 "간병", "요양", "골절", "화상", "생존", "중도", "만기"]
@@ -840,15 +848,52 @@ def get_pay_term(text):
     return PAY_TERM_DEFAULT, ""
 
 
+def strip_ignore_words(s):
+    for w in TERM_IGNORE_WORDS:
+        s = s.replace(w, "")
+    return s
+
+
 def norm_benefit(s):
-    """급부명 비교용: 괄호·공백·로마숫자·끝의 '자금/비/금' 등 제거"""
-    s = nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", s or ""))
+    """급부명 비교용: 괄호·공백·로마숫자·무시할 말('주요')·끝의 '자금/비/금' 등 제거"""
+    s = strip_ignore_words(nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", s or "")))
     s = re.sub(r"(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ|Ⅴ|II|III|IV)+$", "", s)
     for suf in NAME_SUFFIXES:
         if s.endswith(suf) and len(s) > len(suf) + 1:
             s = s[: -len(suf)]
             break
     return s
+
+
+def paren_parts(code_name):
+    """급부코드명 괄호 안 → (구분어 목록, 질병명 목록). 예) '암진단(간병비)' → (['간병'], []),
+    '3대암(위암,폐암,간암)진단' → ([], ['위암', '폐암', '간암'])"""
+    quals, diseases = [], []
+    for inner in re.findall(r"[\(\[【]([^\)\]】]*)[\)\]】]", code_name or ""):
+        for tok in re.split(r"[,·/ㆍ\s]+", inner):
+            tok = strip_ignore_words(nospace(tok))
+            if not tok:
+                continue
+            if any(tok.endswith(e) for e in DISEASE_ENDINGS):
+                diseases.append(tok)
+            else:
+                for suf in NAME_SUFFIXES:                    # 간병비 → 간병
+                    if tok.endswith(suf) and len(tok) > len(suf) + 1:
+                        tok = tok[: -len(suf)]
+                        break
+                quals.append(tok)
+    return quals, diseases
+
+
+def paren_adjust(row, name, reason):
+    """급부코드명 괄호 안의 말로 점수 조정 (구분어가 없으면 감점, 질병명이 지급사유에 있으면 가산)"""
+    quals, diseases = row["_p"]
+    if not quals and not diseases:
+        return 0.0
+    text = strip_ignore_words(nospace(f"{name} {reason}"))
+    adj = -PAREN_MISS_PENALTY * sum(1 for q in quals if q not in text)
+    hits = sum(1 for d in diseases if d in text)
+    return adj + min(PAREN_DISEASE_BONUS_MAX, PAREN_DISEASE_BONUS * hits)
 
 
 def actions_in(text):
@@ -971,6 +1016,7 @@ def load_code_table(path, log=None):
             df["_n"] = df["급부코드명"].map(norm_benefit)
             df["_d"] = df["_n"].map(disease_part)
             df["_a"] = df["급부코드명"].map(actions_in)
+            df["_p"] = df["급부코드명"].map(paren_parts)
             return df.reset_index(drop=True)
     raise RuntimeError(f"급부코드표에서 칼럼명 {CODE_ID_COLS[0]} / {CODE_NM_COLS[0]} 을(를) 찾지 못했습니다.")
 
@@ -987,7 +1033,7 @@ def defined_terms(whole):
 
 def known_terms(whole, codes):
     """지급사유에서 찾을 질병 용어 = 약관 정의 용어 + 급부코드명의 질병 부분"""
-    terms = {nospace(t) for t in defined_terms(whole)}
+    terms = {strip_ignore_words(nospace(t)) for t in defined_terms(whole)}
     if codes is not None:
         terms |= {d for d in codes["_d"] if len(d) >= 2 and any(d.endswith(e) for e in DISEASE_ENDINGS)}
     terms |= set(TERM_ALIAS)
@@ -996,7 +1042,7 @@ def known_terms(whole, codes):
 
 def terms_in_reason(reason, terms):
     """지급사유에 나온 질병 용어(긴 것 우선, 겹치지 않게). '(…제외)' 안과 'OO보장개시일' 은 제외"""
-    t = re.sub(r"\([^()]*제외[^()]*\)", " ", reason)
+    t = strip_ignore_words(re.sub(r"\([^()]*제외[^()]*\)", " ", reason))
     t = re.sub(r"\S*보장\s*개시일", " ", t)
     quoted = {nospace(q) for q in re.findall(r"[‘'“\"「]([^’'”\"」]{1,20})[’'”\"」]", t)
               if any(nospace(q).endswith(e) for e in DISEASE_ENDINGS)}
@@ -1078,32 +1124,34 @@ def match_codes(name, reason, codes, terms):
     if codes is None or codes.empty:
         return names_without_codes(name, reason, terms)
     n = norm_benefit(name)
+    adj = codes.apply(lambda r: paren_adjust(r, name, reason), axis=1)       # 괄호 안 구분어·질병명
+    score = lambda s: round(min(1.0, float(s)), 2)
     # 1) 급부명 전체가 거의 같은 코드
-    ratios = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio())
+    ratios = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio()) + adj
     i = ratios.idxmax()
     if ratios[i] >= NAME_DIRECT_SCORE:
-        return [(codes.at[i, "급부코드"], codes.at[i, "급부코드명"], round(float(ratios[i]), 2), "급부명 일치")]
+        return [(codes.at[i, "급부코드"], codes.at[i, "급부코드명"], score(ratios[i]), "급부명 일치")]
     # 2) 지급사유의 질병 용어마다
     acts = actions_in(name) or actions_in(reason)
     found = terms_in_reason(reason, terms)
     out = []
     for term in found:
-        sc = codes.apply(lambda r: _score(term, acts, r), axis=1)
+        sc = codes.apply(lambda r: _score(term, acts, r), axis=1) + adj
         j = sc.idxmax()
         if sc[j] >= MATCH_MIN_SCORE:
-            out.append((codes.at[j, "급부코드"], codes.at[j, "급부코드명"], round(float(sc[j]), 2),
+            out.append((codes.at[j, "급부코드"], codes.at[j, "급부코드명"], score(sc[j]),
                         f"지급사유 질병명: {term}"))
         else:
-            out.append(("", "", round(float(sc[j]), 2), f"지급사유 질병명: {term} (맞는 코드 없음)"))
+            out.append(("", "", score(sc[j]), f"지급사유 질병명: {term} (맞는 코드 없음)"))
     if any(c for c, *_ in out):
         return out
     # 3) 급부명과 가장 비슷한 코드
     d = disease_part(n)
-    sc = codes.apply(lambda r: max(_score(d, acts, r), difflib.SequenceMatcher(None, n, r["_n"]).ratio()), axis=1)
+    sc = codes.apply(lambda r: max(_score(d, acts, r), difflib.SequenceMatcher(None, n, r["_n"]).ratio()), axis=1) + adj
     j = sc.idxmax()
     if sc[j] >= MATCH_MIN_SCORE:
-        return [(codes.at[j, "급부코드"], codes.at[j, "급부코드명"], round(float(sc[j]), 2), "급부명 유사")]
-    return out or [("", "", round(float(sc[j]), 2), "맞는 코드 없음")]
+        return [(codes.at[j, "급부코드"], codes.at[j, "급부코드명"], score(sc[j]), "급부명 유사")]
+    return out or [("", "", score(sc[j]), "맞는 코드 없음")]
 
 
 # =====================================================================
