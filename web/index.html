@@ -1,0 +1,1375 @@
+<meta charset="utf-8">
+<title>통계테이블 작성 도구</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* 레이아웃: 얇은 상단바 → 청록 그라데이션 소개 영역(기능 카드 4개) → 가운데 정렬 본문(흰 카드들) → 바닥글 */
+/* 회사 색(청록 #008485, 포인트 분홍)과 Noto Sans KR 유지 · 밝은 화면 하나로 고정 */
+:root {
+  color-scheme: light;
+  --teal: #008485;
+  --teal-600: #00797a;
+  --teal-700: #00676a;
+  --teal-300: #5cc1bb;
+  --teal-100: #d6efed;
+  --teal-50: #eef8f7;
+  --pink: #e4007f;
+  --ink: #17262b;
+  --ink-2: #3a4a4f;
+  --muted: #6b7b80;
+  --line: #e2eaeb;
+  --line-2: #d2dddf;
+  --bg: #f4f8f8;
+  --white: #ffffff;
+  --check: #fff2cc;
+  --check-ink: #6b5000;
+  --ok: #1f9d63;
+  --bad: #c0392b;
+  --r-lg: 18px;
+  --r: 12px;
+  --r-sm: 9px;
+  --shadow-sm: 0 1px 2px rgba(15, 45, 50, 0.06);
+  --shadow: 0 1px 2px rgba(15, 45, 50, 0.05), 0 12px 32px -16px rgba(15, 45, 50, 0.22);
+  --font: "Noto Sans KR", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
+  --mono: "Roboto Mono", Consolas, "D2Coding", monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.65 var(--font); margin: 0; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
+p { margin: 0; }
+button, input { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* ---------- 상단바 ---------- */
+.gnb { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+.gnb-in { max-width: 1160px; margin: 0 auto; padding-inline: 20px; height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.02rem; color: var(--ink); white-space: nowrap; letter-spacing: -0.02em; }
+.brand img { height: 30px; width: auto; display: block; }
+#logo-slot:not(:empty) + .brand-mark { display: none; }
+#home-logo img { width: 76px; height: 76px; display: block; margin-bottom: 4px; }
+body.has-logo .home-mark { display: none; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; flex: none;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-300) 100%); position: relative; box-shadow: 0 4px 10px -4px rgba(0, 132, 133, 0.6); }
+.brand-mark::after { content: ""; position: absolute; right: -3px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--pink); border: 2px solid var(--white); }
+.state { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--white);
+  border: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+.state[data-state="loading"] .dot, .state[data-state="busy"] .dot { background: var(--teal-300); animation: pulse 1s ease-in-out infinite; }
+.state[data-state="ready"] .dot { background: var(--ok); box-shadow: 0 0 0 3px rgba(31, 157, 99, 0.15); }
+.state[data-state="fail"] .dot { background: var(--bad); }
+@keyframes pulse { 50% { opacity: 0.25; } }
+
+/* ---------- 상단바: 기능 화면의 탭 메뉴 ---------- */
+.toolnav { display: flex; gap: 2px; padding: 4px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; }
+.toolnav a { padding: 7px 14px; border-radius: 9px; font-size: 0.88rem; font-weight: 500; color: var(--muted); white-space: nowrap; transition: color 0.15s, background 0.15s; }
+.toolnav a:hover { color: var(--teal-700); }
+.toolnav a.cur { background: var(--white); color: var(--teal-700); font-weight: 700; box-shadow: 0 1px 2px rgba(15, 45, 50, 0.08), 0 0 0 1px var(--teal-100); }
+body[data-view="home"] .toolnav, body[data-view="home"] .brand { display: none; }
+body[data-view="home"] .gnb-in { justify-content: flex-end; }
+body[data-view="home"] .gnb { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ---------- 처음 화면 ---------- */
+.home { min-height: calc(100vh - 62px - 60px); display: grid; place-items: center; padding-inline: 20px; padding-block: 24px 56px;
+  background: radial-gradient(640px 320px at 50% 18%, rgba(0, 132, 133, 0.07), transparent 70%); }
+.home[hidden] { display: none !important; }
+.home-in { width: 100%; max-width: 920px; display: grid; justify-items: center; gap: 14px; text-align: center; }
+.home-mark { width: 60px; height: 60px; border-radius: 18px; position: relative; margin-bottom: 6px;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-300) 100%); box-shadow: 0 14px 30px -14px rgba(0, 132, 133, 0.8); }
+.home-mark::after { content: ""; position: absolute; right: -5px; top: -5px; width: 16px; height: 16px; border-radius: 50%; background: var(--pink); border: 3px solid var(--bg); }
+.home-title { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.035em; color: var(--ink); line-height: 1.2; }
+.home-sub { font-size: clamp(0.98rem, 1.8vw, 1.1rem); color: var(--muted); max-width: 46ch; }
+.tiles { margin-top: 26px; width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.tile { text-align: left; display: grid; gap: 14px; align-content: start; padding: 20px 18px 18px; cursor: pointer;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--white); color: var(--ink); box-shadow: var(--shadow-sm);
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.tile:hover { transform: translateY(-3px); border-color: var(--teal-100); box-shadow: var(--shadow); }
+.tile:hover .tool-ico { background: var(--teal); color: var(--white); }
+.tool-ico { width: 42px; height: 42px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--teal-50); color: var(--teal); transition: background 0.18s, color 0.18s; }
+.tool-ico svg { width: 22px; height: 22px; }
+.tool-txt { display: grid; gap: 4px; min-width: 0; }
+.tool-txt b { font-size: 1.02rem; font-weight: 700; }
+.tool-txt small { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+.home-note { margin-top: 18px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.home-note::before { content: ""; width: 14px; height: 14px; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.tool-title { font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 700; color: var(--ink); letter-spacing: -0.03em; }
+.tool-title::before { content: ""; display: block; width: 28px; height: 4px; border-radius: 2px; background: var(--teal); margin-bottom: 14px; }
+
+/* ---------- 본문 ---------- */
+.main { max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 30px 64px; }
+.panel { display: grid; gap: 20px; }
+.panel > .lead { margin-top: -8px; }
+.panel[hidden] { display: none !important; }
+.lead { font-size: 1.08rem; color: var(--ink-2); max-width: 70ch; }
+.lead b { color: var(--teal-700); font-weight: 700; }
+
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; counter-reset: step; }
+.step { position: relative; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 18px 18px 62px;
+  display: grid; gap: 4px; align-content: start; box-shadow: var(--shadow-sm); }
+.step::before { counter-increment: step; content: counter(step); position: absolute; left: 18px; top: 18px; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: 0.9rem; color: var(--teal); background: var(--teal-50); border: 1px solid var(--teal-100); }
+.step .no { display: none; }
+.step h3 { font-size: 1rem; font-weight: 700; color: var(--ink); }
+.step p { font-size: 0.88rem; color: var(--muted); }
+.step b { color: var(--ink-2); font-weight: 500; }
+.step a, .lead a { color: var(--teal); text-decoration: underline; text-underline-offset: 3px; }
+.sheets-list { margin: 4px 0 2px; padding-left: 18px; font-size: 0.84rem; color: var(--muted); }
+.sheets-list b { color: var(--ink-2); font-weight: 500; }
+
+.sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; scroll-margin-top: 80px; }
+.sec > * { min-width: 0; }
+.sec-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 1.18rem; font-weight: 700; color: var(--ink); }
+.tag { font-size: 0.72rem; font-weight: 500; padding: 2px 10px; border-radius: 999px; background: var(--teal-50); color: var(--teal-700); border: 1px solid var(--teal-100); }
+
+/* 실행 카드 */
+.runbox { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.band { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 16px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+.band strong { font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.band span { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.band span::before { content: ""; width: 14px; height: 14px; flex: none; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.form { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 12px 14px; padding: 18px 22px 4px; align-items: center; }
+.form > * { min-width: 0; }
+.form .k { font-size: 0.88rem; font-weight: 500; color: var(--ink-2); }
+.form .k small { color: var(--muted); font-weight: 400; }
+.field { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-sm); border: 1.5px dashed var(--line-2);
+  background: #fafcfc; font-size: 0.9rem; overflow: hidden; transition: border-color 0.15s, background 0.15s; }
+.field::before { content: ""; width: 18px; height: 18px; flex: none; background: var(--teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.field.empty::before { background: var(--line-2); }
+.field:not(.empty) { border-style: solid; border-color: var(--teal-100); background: var(--teal-50); }
+.field:hover { border-color: var(--teal-300); }
+.field span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field.empty span { color: #98a6aa; }
+.field.drag { border-color: var(--teal); background: var(--teal-50); }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+button { cursor: pointer; border: 1px solid var(--line-2); background: var(--white); color: var(--ink-2); padding: 9px 15px; font-size: 0.88rem;
+  border-radius: var(--r-sm); transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s; }
+button:hover:not(:disabled) { border-color: var(--teal-300); color: var(--teal-700); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--teal); border-color: var(--teal); color: var(--white); font-weight: 700; min-width: 150px; padding: 12px 24px; font-size: 0.98rem;
+  box-shadow: 0 8px 18px -10px rgba(0, 132, 133, 0.85); }
+button.primary:hover:not(:disabled) { background: var(--teal-600); color: var(--white); transform: translateY(-1px); }
+button.ghost { padding: 12px 18px; font-size: 0.98rem; }
+button.link { border: none; background: none; padding: 6px; color: var(--teal); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; box-shadow: none; }
+button.link:hover:not(:disabled) { color: var(--teal-700); }
+.hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; padding: 18px 22px 20px; }
+.notice { margin: 0 22px 14px; padding: 11px 14px; border-radius: var(--r-sm); background: var(--teal-50); color: var(--teal-700); font-size: 0.9rem; border: 1px solid var(--teal-100); }
+.notice.warn { background: var(--check); color: var(--check-ink); border-color: #f3e2a8; }
+.notice.err { background: #fdeeec; color: var(--bad); border-color: #f5cdc7; }
+.console { margin: 0 22px 22px; background: #f7fafa; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 14px; height: 170px; overflow: auto;
+  font: 0.8rem/1.75 var(--mono); color: var(--ink-2); white-space: pre-wrap; word-break: break-all; }
+.console .dim { color: #8a989c; }
+.console .err { color: var(--bad); }
+
+/* 결과 카드 */
+.result-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px 20px; padding: 18px 20px;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow-sm); }
+.fname { font: 0.8rem var(--mono); color: var(--muted); word-break: break-all; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.stats > span { display: inline-flex; align-items: baseline; gap: 4px; padding: 6px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line);
+  font-size: 0.82rem; color: var(--muted); }
+.stats b { font: 700 1.12rem var(--font); color: var(--teal-700); font-variant-numeric: tabular-nums; margin-left: 2px; }
+.stats .chk { background: #fffaea; border-color: #f3e2a8; }
+.stats .chk b { color: var(--check-ink); background: none; padding: 0; }
+.sheet { background: var(--white); border: 1px solid var(--line); border-top: none; border-radius: 0 0 var(--r-lg) var(--r-lg); overflow: hidden; box-shadow: var(--shadow); }
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #fafcfc; }
+.tab { border: none; border-radius: 8px; background: transparent; padding: 7px 14px; color: var(--muted); white-space: nowrap; font-size: 0.88rem; font-weight: 500; }
+.tab:hover:not(:disabled) { color: var(--teal-700); background: var(--teal-50); }
+.tab[aria-selected="true"] { background: var(--white); color: var(--teal-700); font-weight: 700; box-shadow: 0 0 0 1px var(--teal-100), 0 2px 6px -2px rgba(0, 104, 106, 0.25); }
+.tab .n { font: 0.72rem var(--mono); margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.tab[aria-selected="true"] .n { background: var(--teal-50); color: var(--teal-700); }
+.sheet-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 10px 16px; font-size: 0.82rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+.sheet-tools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--teal); }
+.legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); display: inline-block; }
+.more { padding: 9px 16px; font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--line); }
+.grid-wrap { overflow: auto; max-height: 560px; }
+table { border-collapse: separate; border-spacing: 0; font-size: 0.84rem; min-width: 100%; }
+th, td { border-bottom: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+th { position: sticky; top: 0; z-index: 1; background: #f3f8f8; color: var(--ink-2); font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+td { white-space: nowrap; color: var(--ink); }
+tbody tr:hover td { background: #f7fbfb; }
+td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.long { white-space: normal; min-width: 260px; max-width: 440px; }
+td.rowno, th.rowno { color: #9aa8ac; text-align: right; font: 0.72rem var(--mono); background: #fafcfc; }
+tr.marked td:not(.rowno) { color: var(--ink); }
+.empty-sheet { padding: 32px; text-align: center; color: var(--muted); }
+
+/* 알아두세요 */
+.notes { margin: 0; padding: 18px 22px 18px 40px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); display: grid; gap: 8px; font-size: 0.9rem; color: var(--ink-2); }
+.notes li::marker { color: var(--teal); }
+.notes b { font-weight: 700; color: var(--ink); }
+code { font-family: var(--mono); font-size: 0.85em; background: var(--bg); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
+
+/* ---------- 약관 정보 ---------- */
+.info-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; padding: 16px 18px;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.info-bar .stats { margin-top: 0; }
+.info-bar input[type="search"] { border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px 14px; font-size: 0.9rem; min-width: 0; width: 280px; max-width: 100%; background: #fafcfc; }
+.info-bar input[type="search"]:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-100); background: var(--white); }
+.prod { margin-top: 18px; display: grid; gap: 8px; }
+.prod h3 { font-size: 1.08rem; font-weight: 700; color: var(--teal-700); }
+.prod .meta { font-size: 0.82rem; color: var(--muted); }
+.info-wrap { overflow-x: auto; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); }
+.info { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 820px; font-size: 0.88rem; }
+.info th { position: static; }
+.info td { padding: 14px 12px; white-space: normal; }
+.info tbody tr:last-child td { border-bottom: none; }
+.info td.ben { width: 17%; }
+.info td.why { width: 30%; color: var(--ink-2); }
+.info td.amt { width: 25%; }
+.info td.wait, .info td.res { width: 14%; }
+.info .main { font-weight: 500; color: var(--ink); }
+.info .big { font-size: 1.02rem; font-weight: 700; color: var(--ink); }
+.info .sub { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--muted); }
+.info .flag { display: inline-block; margin-top: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; background: var(--check); color: var(--check-ink); }
+.info .memo { display: block; margin-top: 4px; font-size: 0.78rem; color: var(--check-ink); }
+.info .yes { color: var(--teal); }
+.info .no { color: var(--muted); }
+.info .unk { color: var(--check-ink); background: var(--check); padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; }
+.info tr.hide { display: none; }
+
+/* ---------- 약관 비교 ---------- */
+.cmp-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 18px 22px 4px; }
+.cmp-files > div { display: grid; gap: 8px; min-width: 0; }
+.cmp-files .k { font-size: 0.88rem; font-weight: 500; color: var(--ink-2); }
+.cmp-files .field { margin: 0; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+.pill.변경 { background: #fff2cc; color: #6b5000; }
+.pill.신설, .pill.추가 { background: #dcebf8; color: #1d4f7a; }
+.pill.삭제 { background: #fbdccf; color: #7a2e12; }
+.pill.동일 { background: var(--bg); color: var(--muted); }
+.pill.이름 { background: var(--teal-50); color: var(--teal-700); }
+.cmp-section { margin-top: 18px; display: grid; gap: 10px; }
+.cmp-section h3 { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+.cmp-list { list-style: none; margin: 0; padding: 0; background: var(--white); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow-sm); }
+.cmp-list > li { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.cmp-list > li:last-child { border-bottom: none; }
+.cmp-list > li.hide { display: none; }
+.cmp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cmp-head b { font-size: 0.98rem; color: var(--ink); }
+.cmp-head small { color: var(--muted); font-size: 0.8rem; }
+.chg { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 5px 12px; margin: 0; font-size: 0.88rem; }
+.chg dt { color: var(--muted); font-weight: 500; }
+.chg dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.diff del { background: #fde3df; color: #9c2b1c; text-decoration: line-through; padding: 1px 4px; border-radius: 4px; }
+.diff ins { background: #d8f1e4; color: #155f37; text-decoration: none; padding: 1px 4px; border-radius: 4px; font-weight: 500; }
+.cmp-note { font-size: 0.82rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+details.cmp-body summary { cursor: pointer; font-weight: 700; color: var(--ink); padding: 6px 0; }
+
+/* ---------- 바닥글 ---------- */
+.foot { border-top: 1px solid var(--line); background: var(--white); }
+.foot-in { max-width: 1160px; margin: 0 auto; padding-inline: 20px; padding-block: 18px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px;
+  font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- 좁은 화면 ---------- */
+@media (max-width: 960px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gnb-in { gap: 10px; }
+  .brand > span:last-child { display: none; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .gnb-in, .main, .foot-in { padding-inline: 16px; }
+  .home { padding-inline: 16px; }
+  .tile { padding: 14px; gap: 10px; }
+  .tool-ico { width: 36px; height: 36px; }
+  .tool-txt small { display: none; }
+  .toolnav a { padding: 6px 10px; font-size: 0.82rem; }
+  .gnb-in { height: auto; min-height: 58px; flex-wrap: wrap; padding-block: 8px; }
+  body[data-view="tool"] .toolnav { order: 3; width: 100%; }
+  .form { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 16px 16px 4px; }
+  .form .k { margin-top: 6px; }
+  .band, .bar { padding-inline: 16px; }
+  .notice, .console { margin-inline: 16px; }
+  .cmp-files { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 4px; }
+  .chg { grid-template-columns: minmax(0, 1fr); }
+  .state { padding: 5px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .dot { animation: none !important; }
+  .tile, button { transition: none; }
+  .tile:hover, button.primary:hover:not(:disabled) { transform: none; }
+}
+</style>
+<header class="gnb">
+  <div class="gnb-in">
+    <a class="brand" href="#" id="brand-home" aria-label="처음 화면으로"><span id="logo-slot"></span><span class="brand-mark" aria-hidden="true"></span><span>통계테이블 작성 도구</span></a>
+    <nav class="toolnav" aria-label="기능">
+      <a href="#info" data-tool-link="info">약관 정보</a>
+      <a href="#compare" data-tool-link="compare">약관 비교</a>
+      <a href="#extract" data-tool-link="extract">약관에서 추출</a>
+      <a href="#revise" data-tool-link="revise">개정 후 자동화</a>
+    </nav>
+    <div class="state" id="engine" data-state="loading" role="status"><span class="dot"></span><span id="engine-text">준비 중</span></div>
+  </div>
+</header>
+
+<section class="home" id="home" aria-label="처음 화면">
+  <div class="home-in">
+    <span id="home-logo" aria-hidden="true"></span>
+    <span class="home-mark" aria-hidden="true"></span>
+    <h1 class="home-title">통계테이블 작성 도구</h1>
+    <p class="home-sub">약관 PDF·Word만 올리면 통계테이블 초안부터 개정 · 요약 · 비교까지 한 번에 끝냅니다.</p>
+    <div class="tiles" aria-label="기능 선택">
+        <button type="button" class="tooltab tile" id="tab-info" data-tool="info" aria-controls="panel-info">
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/></svg></span><span class="tool-txt"><b>약관 정보</b><small>급부별 보험금 · 면책 · 적립금 요약</small></span>
+        </button>
+        <button type="button" class="tooltab tile" id="tab-compare" data-tool="compare" aria-controls="panel-compare">
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7.5" height="16" rx="1.8"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.8"/><path d="M5.5 9h2.5M5.5 12.5h2.5M16 9h2.5M16 12.5h2.5"/></svg></span><span class="tool-txt"><b>약관 비교</b><small>변경 전·후 약관의 달라진 점</small></span>
+        </button>
+        <button type="button" class="tooltab tile" id="tab-extract" data-tool="extract" aria-controls="panel-extract">
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4"/></svg></span><span class="tool-txt"><b>약관에서 추출</b><small>상품 약관 → 통계테이블 초안</small></span>
+        </button>
+        <button type="button" class="tooltab tile" id="tab-revise" data-tool="revise" aria-controls="panel-revise">
+          <span class="tool-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></svg></span><span class="tool-txt"><b>개정 후 자동화</b><small>기존 테이블 + 코드 변경 → 개정 후 테이블</small></span>
+        </button>
+    </div>
+    <p class="home-note">파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</p>
+  </div>
+</section>
+
+<div id="app" hidden>
+<main class="main">
+      <!-- ===================== 약관에서 추출 ===================== -->
+      <div class="panel" id="panel-extract" aria-label="약관에서 추출">
+        <h1 class="tool-title">약관에서 추출</h1>
+        <p class="lead">상품 약관에서 보험금 지급기준표를 찾아 <b>통계테이블 초안 엑셀</b>을 만들어 드립니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
+            <p><b>하나생명 홈페이지 → 상품공시실</b>에서 상품 약관(PDF)을 내려받습니다. 상품별 Word 약관(.docx)도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>약관 선택 후 실행</h3>
+            <p>약관 파일이나 폴더를 고르고 <b>[실행]</b>을 누릅니다. 급부코드표가 있으면 함께 고르세요. 급부마다 급부코드를 찾아 줍니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>결과 확인 · 내려받기</h3>
+            <p><b>노란색 행</b>은 확인이 필요한 항목입니다. 엑셀로 내려받아 검토하세요.</p></div>
+        </div>
+
+        <section class="sec" aria-label="약관 선택">
+          <h2 class="sec-title">약관 선택 · 실행</h2>
+          <div class="runbox">
+            <div class="band"><strong>약관 파일 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
+            <div class="form">
+              <label class="k" for="x-pick-file">약관 파일</label>
+              <div class="field empty" id="x-src-field"><span id="x-src-text">PDF·Word 약관을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns">
+                <button type="button" id="x-pick-file">파일 선택</button>
+                <button type="button" id="x-pick-dir">폴더 선택</button>
+              </div>
+              <label class="k" for="x-pick-code">급부코드표 <small>(선택)</small></label>
+              <div class="field empty" id="x-code-field"><span id="x-code-text">엑셀·CSV · CD_ID(급부코드), CD_NM(급부명) 칼럼</span></div>
+              <div class="btns">
+                <button type="button" id="x-pick-code">파일 선택</button>
+                <button type="button" id="x-clear-code" hidden>지우기</button>
+              </div>
+            </div>
+            <input class="hidden-input" type="file" id="x-in-dir" webkitdirectory multiple>
+            <input class="hidden-input" type="file" id="x-in-file" multiple accept=".docx,.docm,.doc,.pdf">
+            <input class="hidden-input" type="file" id="x-in-code" accept=".xlsx,.xls,.csv">
+            <div class="bar">
+              <button type="button" class="primary" id="x-run" disabled>실행</button>
+              <button type="button" class="ghost" id="x-stop" disabled>중단</button>
+              <button type="button" class="link" id="x-sample" disabled>예제 약관으로 해 보기</button>
+            </div>
+            <p class="notice" id="x-msg" hidden></p>
+            <div class="console" id="x-log" aria-live="polite" tabindex="0"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="x-result" aria-label="추출 결과">
+          <h2 class="sec-title">결과 확인 <span class="tag" id="x-tag">예제 결과</span></h2>
+          <div class="result" id="x-view"></div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li><b>엑셀 시트</b>: 초안(통계테이블 형식) · 특약별요약 · 급부원문(원문과 근거) · 처리결과(파일별 성공/실패)</li>
+            <li><b>급부코드</b>: 급부코드표(CD_ID · CD_NM 칼럼, 엑셀이나 CSV)를 고르면 급부명이 거의 같은 코드를 찾고, 아니면 지급사유의 질병명마다 코드를 찾습니다. 질병명이 여러 개면(예: 기타피부암 · 갑상선암) 행도 여러 개가 됩니다. 코드표가 없으면 약관 기준 급부명(약관급부명)을 적습니다.</li>
+            <li><b>산출기준</b>: 01 보험가입금액 · 02 보험료(월납·일시납·기본보험료) · 03 기납입보험료 · 10 MAX(가입금액, 기납입보험료) × 추가설계 비율 · 95~98 1구좌(보험료 1천만원 · 1억원 · 5천만원 · 100만원). 1구좌 상품의 지급율은 지급금액 ÷ 1구좌 보험료입니다.</li>
+            <li><b>지급주기</b>: 정해진 횟수만큼 매월 지급(예: 120회 한도로 매월, 36회 월지급)이면 211, 그 밖에는 100입니다.</li>
+            <li>감액이 있으면 경과 구간을 나눕니다. 예) 0~12개월 : 50% / 13~999개월 : 100%</li>
+            <li>문서보안(DRM)이 걸린 파일과 <b>.doc</b> 파일은 읽을 수 없습니다. PDF나 .docx로 올려 주세요.</li>
+            <li>처음 열 때 준비에 1분 정도 걸립니다. 1,500쪽 PDF는 5분 안팎 걸립니다.</li>
+            <li>중단하면 처리 중이던 결과는 저장되지 않습니다.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ===================== 개정 후 자동화 ===================== -->
+      <div class="panel" id="panel-revise" aria-label="개정 후 자동화" hidden>
+        <h1 class="tool-title">개정 후 자동화</h1>
+        <p class="lead">개정 전 통계테이블을 바탕으로, 상품코드만 바뀐 상품의 <b>개정 후 통계테이블</b>을 자동으로 채웁니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>양식 엑셀 준비</h3>
+            <p>시트 5개를 순서대로 둔 엑셀을 준비합니다.</p>
+            <ol class="sheets-list">
+              <li><b>통계테이블 작성 대상</b> (채워질 곳)</li>
+              <li><b>통계테이블 기존</b> (개정 전)</li>
+              <li><b>주보종-개별상품 관계</b> (주보종명, 개별상품명, SP_SPCD, SP_SPCD1)</li>
+              <li><b>변경전·후 상품코드</b> (변경전, 변경후)</li>
+              <li><b>급부코드 체계</b> (급부코드, 급부명)</li>
+            </ol>
+            <p><button type="button" class="link" id="r-template">예제 양식 내려받기</button></p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>양식 선택 후 실행</h3>
+            <p>양식 엑셀을 고르고 <b>[실행]</b>을 누릅니다. 변경후 코드마다 변경전 코드의 기존 행을 이어받아 1번 시트를 채웁니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>검토 · 내려받기</h3>
+            <p><b>검토_상품코드</b> 시트의 색 표시된 상품은 직접 확인하거나 약관을 보고 작성합니다.</p></div>
+        </div>
+
+        <section class="sec" aria-label="양식 선택">
+          <h2 class="sec-title">양식 선택 · 실행</h2>
+          <div class="runbox">
+            <div class="band"><strong>양식 엑셀 선택</strong><span>원본 파일은 바뀌지 않고, 결과는 새 엑셀로 받습니다</span></div>
+            <div class="form">
+              <label class="k" for="r-pick-file">양식 엑셀</label>
+              <div class="field empty" id="r-src-field"><span id="r-src-text">시트 5개짜리 양식(.xlsx)을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns"><button type="button" id="r-pick-file">파일 선택</button></div>
+            </div>
+            <input class="hidden-input" type="file" id="r-in-file" accept=".xlsx,.xlsm">
+            <div class="bar">
+              <button type="button" class="primary" id="r-run" disabled>실행</button>
+              <button type="button" class="link" id="r-sample" disabled>예제 양식으로 해 보기</button>
+            </div>
+            <p class="notice" id="r-msg" hidden></p>
+            <div class="console" id="r-log" aria-live="polite" tabindex="0"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="r-result" aria-label="자동화 결과">
+          <h2 class="sec-title">결과 확인 <span class="tag" id="r-tag">예제 결과</span></h2>
+          <div class="result" id="r-view"></div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li><b>처리 방식</b>: [변경전·후 상품코드] 시트의 <b>변경후 코드만</b> 작성합니다. 기존 테이블에서 변경전 코드의 행을 그대로 가져오고, 관계 시트에서 변경후 코드의 주보종코드를 찾아 주보종·개별상품코드만 새 코드로 바꿉니다. 급부코드·산출기준·지급율·지급주기·적립금·면책·경과년은 기존 값 그대로입니다.</li>
+            <li><b>상태</b>: 완료 · 확인필요(변경전 코드나 주보종이 여러 개 등) · 기존 행 없음 · 신규(변경전 없음) · 주보종 모름. <b>기존 행 없음</b>과 <b>신규</b>는 약관을 보고 직접 작성하세요. [약관에서 추출] 탭을 쓰면 됩니다.</li>
+            <li><b>주보종 모름</b>: 변경후 코드가 관계 시트에 없으면 행을 1번 시트에 넣지 않고 <b>보류_주보종없음</b> 시트에 따로 둡니다. 주보종코드를 채워서 옮기세요.</li>
+            <li>시트는 이름이 아니라 <b>순서</b>로 찾습니다. 칼럼명(MAIN_PROD_CODE 등)은 위에서 10행 안에 있어야 합니다.</li>
+            <li>관계 시트의 그 밖의 칼럼(주보종명, 개별상품명 등)은 검토_상품코드 시트 끝에 함께 표시됩니다.</li>
+            <li>결과 엑셀에서 그림·차트·매크로는 빠질 수 있습니다. 표 데이터는 그대로입니다.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ===================== 약관 정보 ===================== -->
+      <div class="panel" id="panel-info" aria-label="약관 정보" hidden>
+        <h1 class="tool-title">약관 정보</h1>
+        <p class="lead">약관을 올리면 <b>급부마다 언제, 얼마를 지급하는지</b>와 면책기간, 적립금 지급 여부를 한눈에 정리해 드립니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>약관 내려받기</h3>
+            <p><b>하나생명 홈페이지 → 상품공시실</b>에서 상품 약관(PDF)을 내려받습니다. Word 약관(.docx)도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>약관 선택 후 요약 보기</h3>
+            <p>약관 파일을 고르고 <b>[요약 보기]</b>를 누릅니다. 여러 상품을 한 번에 올려도 됩니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>급부별 정보 확인</h3>
+            <p>특약별로 지급사유 · 지급금액 · 면책기간 · 적립금 지급 여부가 정리됩니다. <b>노란 표시</b>는 원문을 확인하세요.</p></div>
+        </div>
+
+        <section class="sec" aria-label="약관 선택">
+          <h2 class="sec-title">약관 선택</h2>
+          <div class="runbox">
+            <div class="band"><strong>약관 파일 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
+            <div class="form">
+              <label class="k" for="i-pick-file">약관 파일</label>
+              <div class="field empty" id="i-src-field"><span id="i-src-text">PDF·Word 약관을 고르거나 여기로 끌어다 놓으세요</span></div>
+              <div class="btns">
+                <button type="button" id="i-pick-file">파일 선택</button>
+                <button type="button" id="i-pick-dir">폴더 선택</button>
+              </div>
+            </div>
+            <input class="hidden-input" type="file" id="i-in-dir" webkitdirectory multiple>
+            <input class="hidden-input" type="file" id="i-in-file" multiple accept=".docx,.docm,.doc,.pdf">
+            <div class="bar">
+              <button type="button" class="primary" id="i-run" disabled>요약 보기</button>
+              <button type="button" class="link" id="i-sample" disabled>예제 약관으로 해 보기</button>
+            </div>
+            <p class="notice" id="i-msg" hidden></p>
+            <div class="console" id="i-log" aria-live="polite" tabindex="0" style="height:120px"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="i-result" aria-label="약관 요약">
+          <h2 class="sec-title">급부별 요약 <span class="tag" id="i-tag">예제 결과</span></h2>
+          <div>
+            <div class="info-bar">
+              <div class="stats" id="i-stats"></div>
+              <input type="search" id="i-filter" placeholder="급부명 · 특약명 찾기" aria-label="급부명 또는 특약명으로 찾기">
+            </div>
+            <div id="i-view"></div>
+          </div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li>약관의 <b>보험금 지급기준표</b>(급부명 · 지급사유 · 지급금액 표)를 읽어 정리합니다. [약관에서 추출] 탭과 같은 규칙이라 결과도 같습니다.</li>
+            <li><b>지급금액</b>은 약관 원문 그대로 보여 주고, 아래에 통계테이블에 들어가는 값(산출기준 · 지급율 · 감액)을 함께 적었습니다.</li>
+            <li><b>면책기간</b>은 지급사유의 'OO보장개시일'을 약관 본문에서 찾아 일수로 바꿉니다. 문구가 없으면 0일(면책 없음)입니다.</li>
+            <li><b>적립금 지급</b>은 사망 · 최초 1회 · 특정 시점 지급이면 '지급', 매년 · 1회당처럼 반복 지급이면 '미지급'으로 봅니다.</li>
+            <li>규칙으로 판단이 애매한 항목은 노란색으로 표시됩니다. 꼭 약관 원문을 확인하세요.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ===================== 약관 비교 ===================== -->
+      <div class="panel" id="panel-compare" aria-label="약관 비교" hidden>
+        <h1 class="tool-title">약관 비교</h1>
+        <p class="lead">같은 상품의 <b>변경 전</b> 약관과 <b>변경 후</b> 약관을 올리면, 지급기준표를 중심으로 달라진 점을 정리해 드립니다.</p>
+        <div class="steps">
+          <div class="step"><span class="no">STEP 1</span><h3>약관 두 개 준비</h3>
+            <p>같은 상품의 변경 전·후 약관(PDF 또는 Word)을 준비합니다. <b>상품공시실</b>의 판매중지 상품에서 이전 약관을 받을 수 있습니다.</p></div>
+          <div class="step"><span class="no">STEP 2</span><h3>전·후 선택 후 비교</h3>
+            <p>변경 전, 변경 후 칸에 각각 약관을 고르고 <b>[비교 실행]</b>을 누릅니다.</p></div>
+          <div class="step"><span class="no">STEP 3</span><h3>달라진 점 확인</h3>
+            <p>급부마다 <b>변경 · 신설 · 삭제</b>로 나뉘고, 바뀐 글자는 <del style="background:#fbe0dc;color:#9c2b1c">빨간 줄</del> → <ins style="background:#d6efe0;color:#155f37;text-decoration:none">초록</ins>으로 보입니다.</p></div>
+        </div>
+
+        <section class="sec" aria-label="약관 선택">
+          <h2 class="sec-title">약관 선택 · 비교</h2>
+          <div class="runbox">
+            <div class="band"><strong>변경 전 · 후 약관 선택</strong><span>파일은 이 PC 안에서만 처리되고 밖으로 전송되지 않습니다</span></div>
+            <div class="cmp-files">
+              <div>
+                <span class="k">변경 전 약관</span>
+                <div class="field empty" id="c-src-field"><span id="c-src-text">PDF·Word 약관을 고르거나 끌어다 놓으세요</span></div>
+                <div class="btns"><button type="button" id="c-pick-file">파일 선택</button></div>
+              </div>
+              <div>
+                <span class="k">변경 후 약관</span>
+                <div class="field empty" id="c-src2-field"><span id="c-src2-text">PDF·Word 약관을 고르거나 끌어다 놓으세요</span></div>
+                <div class="btns"><button type="button" id="c-pick-file2">파일 선택</button></div>
+              </div>
+            </div>
+            <input class="hidden-input" type="file" id="c-in-file" accept=".docx,.docm,.doc,.pdf">
+            <input class="hidden-input" type="file" id="c-in-file2" accept=".docx,.docm,.doc,.pdf">
+            <div class="bar">
+              <button type="button" class="primary" id="c-run" disabled>비교 실행</button>
+              <button type="button" class="link" id="c-sample" disabled>예제 약관(전·후)으로 해 보기</button>
+            </div>
+            <p class="notice" id="c-msg" hidden></p>
+            <div class="console" id="c-log" aria-live="polite" tabindex="0" style="height:150px"></div>
+          </div>
+        </section>
+
+        <section class="sec" id="c-result" aria-label="비교 결과">
+          <h2 class="sec-title">달라진 점 <span class="tag" id="c-tag">예제 결과</span></h2>
+          <div>
+            <div class="result-bar">
+              <div style="min-width:0">
+                <div class="fname" id="c-files"></div>
+                <div class="stats" id="c-stats"></div>
+              </div>
+              <button type="button" class="primary" id="c-dl">엑셀 내려받기</button>
+            </div>
+            <div id="c-view"></div>
+          </div>
+        </section>
+
+        <section class="sec" aria-label="알아두세요">
+          <h2 class="sec-title">알아두세요</h2>
+          <ul class="notes">
+            <li><b>지급기준표 비교</b>: [약관에서 추출] 탭과 같은 규칙으로 두 약관의 지급기준표를 읽은 뒤, 급부마다 지급사유 · 지급금액 · 산출기준 · 지급율 · 지급주기 · 감액 · 면책기간 · 적립금 지급여부를 비교합니다.</li>
+            <li><b>짝 맞추기</b>: 특약과 급부는 이름으로 짝을 짓습니다. 이름이 조금 바뀌어도(예: 끝에 Ⅱ) 비슷하면 같은 것으로 보고, 짝이 없으면 신설 · 삭제로 표시합니다.</li>
+            <li><b>본문 변경</b>: 지급기준표 밖의 문장 중 바뀐 것도 조항별로 함께 보여 줍니다. PDF는 줄바꿈 위치가 달라져 같은 문장이 '변경'으로 잡힐 수 있습니다.</li>
+            <li>엑셀에는 요약 · 지급기준표_비교 · 특약_비교 · 본문_변경 시트가 들어 있습니다.</li>
+          </ul>
+        </section>
+      </div>
+</main>
+</div>
+
+<footer class="foot">
+  <div class="foot-in">
+    <span>파일은 브라우저 안에서만 처리되고, 결과는 엑셀로 내려받습니다.</span>
+    <span>통계테이블 작성 도구</span>
+  </div>
+</footer>
+
+<script type="application/json" id="sample-extract">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 4개, 급부 14개", "급부 14개 → 초안 15행 (확인필요 4행)", "결과 파일: 통계테이블초안_예제.xlsx"], "sheets": [{"name": "초안", "columns": ["파일명", "특약명", "급부명", "조항", "약관급부명", "매칭근거", "산출기준", "지급율", "지급주기", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"], "rows": [["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", "01", 0.5, "100", 1, 90, 0, 12, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", "01", 1, "100", 1, 0, 13, 999, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)"], ["sample_policy.docx", "무배당 암진단특약", "유사암진단비", "제4조", "유사암진단", "약관 급부명", "01", 0.2, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암입원비", "제5조", "일반암 입원", "지급사유 질병명: 암", "01", 0.02, "100", 0, 90, 0, 999, null], ["sample_policy.docx", "무배당 암진단특약", "암직접치료통원비", "제6조", "일반암 통원", "지급사유 질병명: 암", "01", 0.01, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해사망보험금", null, "상해사망", "약관 급부명", "01", 1, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해수술비", null, "상해수술", "약관 급부명", "01", 0.1, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "골절진단비", null, "골절진단", "약관 급부명", "01", 0.03, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 상해보장특약", "상해후유장해보험금", null, "상해후유장해", "약관 급부명", "01", 1, "100", null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"], ["sample_policy.docx", "무배당 예제저축특약", "사망보험금", "제3조", "사망", "약관 급부명", "10", 1, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제저축특약", "만기환급금", "제4조", "만기환급금", "약관 급부명", "03", 1, "100", null, 0, 0, 999, "적립금 지급여부 확인(지급횟수 문구 없음)"], ["sample_policy.docx", "무배당 예제저축특약", "중도급부금", "제5조", "중도급부금", "약관 급부명", "02", 0.5, "100", 1, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제저축특약", "생활자금", "제6조", "생활자금", "약관 급부명", "01", 0.01, "211", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제구좌형특약", "질병입원일당", "제3조", "질병입원일당", "약관 급부명", "95", 0.002, "100", 0, 0, 0, 999, null], ["sample_policy.docx", "무배당 예제구좌형특약", "질병수술비", "제4조", "질병수술", "약관 급부명", "95", 0.05, "100", 0, 0, 0, 999, null]], "colors": ["#FFF2CC", "#FFF2CC", null, null, null, null, null, null, "#FFF2CC", null, "#FFF2CC", null, null, null, null], "total": 15}, {"name": "특약별요약", "columns": ["파일명", "특약명", "별표명", "급부수", "확인필요급부", "급부목록"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", 4, 1, "암진단비, 유사암진단비, 암입원비, 암직접치료통원비"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", 4, 1, "상해사망보험금, 상해수술비, 골절진단비, 상해후유장해보험금"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", 4, 1, "사망보험금, 만기환급금, 중도급부금, 생활자금"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", 2, 0, "질병입원일당, 질병수술비"]], "colors": [null, null, null, null], "total": 4}, {"name": "급부원문", "columns": ["파일명", "특약명", "별표명", "급부명", "조항", "약관급부명", "매칭근거", "납입주기", "산출기준", "기본지급율", "지급주기", "기준금액(원)", "근거_기준금액", "감액기간(년)", "감액비율", "감액방식", "면책기간", "적립금지급여부", "확인필요", "근거_산출기준", "근거_지급주기", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유", "원문_지급금액"], "rows": [["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암진단비", "제3조", "일반암 진단", "지급사유 질병명: 암", null, "01", 1, "100", null, null, 1, 0.5, "절대값", 90, 1, "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "보험가입금액", null, "1년미만 진단확정시 보험가입금액의 50%", "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "최초 1회", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "유사암진단비", "제4조", "유사암진단", "약관 급부명", null, "01", 0.2, "100", null, null, null, null, null, 0, 1, null, "보험가입금액", null, null, "보장개시일(질병명 없음)", "최초 1회", "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "보험가입금액의 20%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암입원비", "제5조", "일반암 입원", "지급사유 질병명: 암", null, "01", 0.02, "100", null, null, null, null, null, 90, 0, null, "보험가입금액", null, null, "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "반복 지급", "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "1일당 보험가입금액의 2%"], ["sample_policy.docx", "무배당 암진단특약", "【별표1】 암진단특약 보험금 지급기준표", "암직접치료통원비", "제6조", "일반암 통원", "지급사유 질병명: 암", null, "01", 0.01, "100", null, null, null, null, null, 0, 0, null, "보험가입금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해사망보험금", null, "상해사망", "약관 급부명", null, "01", 1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 1, null, "금액", null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 상해의 직접결과로써 사망하였을 때", "1,000만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해수술비", null, "상해수술", "약관 급부명", null, "01", 0.1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, "금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "100만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "골절진단비", null, "골절진단", "약관 급부명", null, "01", 0.03, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, 0, null, "금액", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "30만원"], ["sample_policy.docx", "무배당 상해보장특약", "【별표2】 상해보장특약 보험금 지급기준표", "상해후유장해보험금", null, "상해후유장해", "약관 급부명", null, "01", 1, "100", 10000000, "[기준: 보험가입금액 1,000만원]", null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", "금액", null, null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "1,000만원 × 장해지급률"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "사망보험금", "제3조", "사망", "약관 급부명", null, "10", 1, "100", null, null, null, null, null, 0, 1, null, "MAX(", null, null, "보장개시일 문구 없음 → 0", "사망 급부", "보험기간 중 피보험자가 사망하였을 때", "MAX(보험가입금액, 기납입보험료 합계) × 추가설계 사망보험금 비율"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "만기환급금", "제4조", "만기환급금", "약관 급부명", null, "03", 1, "100", null, null, null, null, null, 0, null, "적립금 지급여부 확인(지급횟수 문구 없음)", "기납입보험료", null, null, "보장개시일 문구 없음 → 0", "지급횟수 문구 없음", "보험기간이 끝날 때까지 피보험자가 살아 있을 때", "기납입보험료의 100%"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "중도급부금", "제5조", "중도급부금", "약관 급부명", "월납", "02", 0.5, "100", null, null, null, null, null, 0, 1, null, "월납", null, null, "보장개시일 문구 없음 → 0", "특정 시점 1회 지급", "계약일부터 10년 경과시점에 피보험자가 살아 있을 때", "[월납] 월납보험료의 50%"], ["sample_policy.docx", "무배당 예제저축특약", "【별표3】 예제저축특약 보험금 지급기준표", "생활자금", "제6조", "생활자금", "약관 급부명", null, "01", 0.01, "211", null, null, null, null, null, 0, 0, null, "보험가입금액", "매월계약해당일에피보험자가살아있을때(120회", null, "보장개시일 문구 없음 → 0", "반복 지급", "계약일부터 10년 경과시점부터 매월 계약해당일에 피보험자가 살아 있을 때 (120회 한도)", "보험가입금액의 1%"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", "질병입원일당", "제3조", "질병입원일당", "약관 급부명", null, "95", 0.002, "100", 10000000, "[기준: 1구좌 = 보험료 1,000만원]", null, null, null, 0, 0, null, "1구좌(보험료 10,000,000원)", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "질병으로 4일 이상 계속 입원하였을 때 (3일 초과 1일당)", "1구좌당 2만원"], ["sample_policy.docx", "무배당 예제구좌형특약", "【별표4】 예제구좌형특약 보험금 지급기준표", "질병수술비", "제4조", "질병수술", "약관 급부명", null, "95", 0.05, "100", 10000000, "[기준: 1구좌 = 보험료 1,000만원]", null, null, null, 0, 0, null, "1구좌(보험료 10,000,000원)", null, null, "보장개시일 문구 없음 → 0", "반복 지급", "질병으로 수술을 받았을 때 (수술 1회당)", "1구좌당 50만원"]], "colors": [null, null, null, null, null, null, null, null, null, null, null, null, null, null], "total": 14}, {"name": "처리결과", "columns": ["파일명", "결과", "급부수", "경로"], "rows": [["sample_policy.docx", "성공", 14, "sample_policy.docx"]], "colors": [null], "total": 1}], "name": "통계테이블초안_예제.xlsx"}</script>
+<script type="application/json" id="sample-revise">{"log": ["기존 테이블 9행 / 관계 5건 / 변경전후 6건", "  완료: 2건", "  확인필요: 1건", "  기존 행 없음: 2건", "작성 대상(변경후 코드): 5개 → 작성 행 수: 8", "결과 파일: 통계테이블_자동작성_예제.xlsx"], "sheets": [{"name": "통계테이블 작성대상", "columns": ["MAIN_PROD_CODE", "SP_PROD_CODE", "SCRP_RISK_PRM_CODE", "CALC_TYPE1", "PAY_RATE1", "PAY_TERM1", "END_RESRV", "MNGR_START_DAYS", "DUR_YR1", "DUR_YR2"], "rows": [["A200", "A2001", "B0101", "01", 0.5, "100", 1, 90, 0, 12], ["A200", "A2001", "B0101", "01", 1, "100", 1, 0, 13, 999], ["A200", "A2001", "B0102", "01", 0.2, "100", 1, 0, 0, 999], ["A200", "A2001", "B0201", "01", 0.02, "100", 0, 90, 0, 999], ["A200", "A2002", "B0301", "01", 1, "100", 1, 0, 0, 999], ["A200", "A2002", "B0302", "01", 0.1, "100", 0, 0, 0, 999], ["A200", "A2003", "B0401", "02", 1, "100", 1, 0, 0, 999], ["A200", "A2003", "B0402", "03", 1, "211", 1, 0, 0, 999]], "colors": [null, null, null, null, null, null, null, null], "total": 8}, {"name": "검토_상품코드", "columns": ["주보종코드", "개별상품코드(변경후)", "변경전코드", "상태", "작성행수", "급부코드", "급부명", "비고", "주보종명", "개별상품명"], "rows": [["A200", "A2001", "A1001", "완료", 4, "B0101, B0102, B0201", "암진단비, 유사암진단비, 암입원비", null, "(무)예제건강보험Ⅱ", "(무)예제암진단특약Ⅱ"], ["A200", "A2002", "A1002", "완료", 2, "B0301, B0302", "상해사망, 상해수술비", null, "(무)예제건강보험Ⅱ", "(무)예제상해보장특약Ⅱ"], ["A200", "A2003", "A1003, A1005", "확인필요", 2, "B0401, B0402", "납입면제, 보험료환급", "변경전 코드가 2개 (A1003, A1005) → 행을 합침", "(무)예제건강보험Ⅱ", "(무)예제납입면제특약Ⅱ"], ["A200", "A2006", "A1007", "기존 행 없음", 0, null, null, "기존 테이블에 A1007 행 없음", "(무)예제건강보험Ⅱ", "(무)예제수술특약Ⅱ"], [null, "A2009", "A1009", "기존 행 없음", 0, null, null, "기존 테이블에 A1009 행 없음", null, null]], "colors": [null, null, "#FFF2CC", "#F8CBAD", "#F8CBAD"], "total": 5}, {"name": "검토_요약", "columns": ["상태", "건수", "설명"], "rows": [["완료", 2, "변경전 코드의 기존 행을 그대로 이어받음"], ["확인필요", 1, "이어받았지만 비고 확인 필요 (변경전 코드 여러 개, 주보종 여러 개 등)"], ["기존 행 없음", 2, "변경전 코드가 기존 테이블에 없음 → 약관 보고 직접 작성"], ["신규(변경전 없음)", 0, "변경전 코드가 비어 있음 → 신규 상품, 약관 보고 직접 작성"], ["주보종 모름", 0, "변경후 코드가 관계 테이블에 없음 → 행은 '보류_주보종없음' 시트에 있음"], ["작성 대상(변경후 코드)", 5, "변경전,후 상품코드 시트 기준"], ["작성된 행 수", 8, "'통계테이블 작성대상' 시트"]], "colors": [null, null, null, null, null, null, null], "total": 7}], "name": "통계테이블_자동작성_예제.xlsx"}</script>
+<script type="application/json" id="sample-info">{"log": ["대상 파일 1개", "[1/1]", "  sample_policy.docx: 특약 4개, 급부 14개", "급부 14개 요약"], "data": {"benefits": [{"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암진단비", "조항": "제3조", "납입주기": "", "산출기준": "01", "기본지급율": 1, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": 1, "감액비율": 0.5, "감액방식": "절대값", "면책기간": 90, "적립금지급여부": 1, "확인필요": "감액: 갱신계약 미적용 문구 있음(갱신형 확인)", "근거_감액": "1년미만 진단확정시 보험가입금액의 50%", "근거_면책": "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "근거_적립금": "최초 1회", "원문_지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "원문_지급금액": "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "유사암진단비", "조항": "제4조", "납입주기": "", "산출기준": "01", "기본지급율": 0.2, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일(질병명 없음)", "근거_적립금": "최초 1회", "원문_지급사유": "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "원문_지급금액": "보험가입금액의 20%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암입원비", "조항": "제5조", "납입주기": "", "산출기준": "01", "기본지급율": 0.02, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 90, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "특약본문: 제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "근거_적립금": "반복 지급", "원문_지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "원문_지급금액": "1일당 보험가입금액의 2%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 암진단특약", "별표명": "【별표1】 암진단특약 보험금 지급기준표", "급부명": "암직접치료통원비", "조항": "제6조", "납입주기": "", "산출기준": "01", "기본지급율": 0.01, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "원문_지급금액": "보험가입금액의 1%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해사망보험금", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 1, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "사망 급부", "원문_지급사유": "보험기간 중 상해의 직접결과로써 사망하였을 때", "원문_지급금액": "1,000만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해수술비", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 0.1, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "원문_지급금액": "100만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "골절진단비", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 0.03, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "원문_지급금액": "30만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 상해보장특약", "별표명": "【별표2】 상해보장특약 보험금 지급기준표", "급부명": "상해후유장해보험금", "조항": "", "납입주기": "", "산출기준": "01", "기본지급율": 1, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": null, "확인필요": "적립금 지급여부 확인(지급횟수 문구 없음)", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "지급횟수 문구 없음", "원문_지급사유": "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "원문_지급금액": "1,000만원 × 장해지급률"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제저축특약", "별표명": "【별표3】 예제저축특약 보험금 지급기준표", "급부명": "사망보험금", "조항": "제3조", "납입주기": "", "산출기준": "10", "기본지급율": 1, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "사망 급부", "원문_지급사유": "보험기간 중 피보험자가 사망하였을 때", "원문_지급금액": "MAX(보험가입금액, 기납입보험료 합계) × 추가설계 사망보험금 비율"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제저축특약", "별표명": "【별표3】 예제저축특약 보험금 지급기준표", "급부명": "만기환급금", "조항": "제4조", "납입주기": "", "산출기준": "03", "기본지급율": 1, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": null, "확인필요": "적립금 지급여부 확인(지급횟수 문구 없음)", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "지급횟수 문구 없음", "원문_지급사유": "보험기간이 끝날 때까지 피보험자가 살아 있을 때", "원문_지급금액": "기납입보험료의 100%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제저축특약", "별표명": "【별표3】 예제저축특약 보험금 지급기준표", "급부명": "중도급부금", "조항": "제5조", "납입주기": "월납", "산출기준": "02", "기본지급율": 0.5, "지급주기": "100", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 1, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "특정 시점 1회 지급", "원문_지급사유": "계약일부터 10년 경과시점에 피보험자가 살아 있을 때", "원문_지급금액": "[월납] 월납보험료의 50%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제저축특약", "별표명": "【별표3】 예제저축특약 보험금 지급기준표", "급부명": "생활자금", "조항": "제6조", "납입주기": "", "산출기준": "01", "기본지급율": 0.01, "지급주기": "211", "기준금액(원)": null, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "계약일부터 10년 경과시점부터 매월 계약해당일에 피보험자가 살아 있을 때 (120회 한도)", "원문_지급금액": "보험가입금액의 1%"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제구좌형특약", "별표명": "【별표4】 예제구좌형특약 보험금 지급기준표", "급부명": "질병입원일당", "조항": "제3조", "납입주기": "", "산출기준": "95", "기본지급율": 0.002, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "질병으로 4일 이상 계속 입원하였을 때 (3일 초과 1일당)", "원문_지급금액": "1구좌당 2만원"}, {"파일명": "sample_policy.docx", "특약명": "무배당 예제구좌형특약", "별표명": "【별표4】 예제구좌형특약 보험금 지급기준표", "급부명": "질병수술비", "조항": "제4조", "납입주기": "", "산출기준": "95", "기본지급율": 0.05, "지급주기": "100", "기준금액(원)": 10000000, "감액기간(년)": null, "감액비율": null, "감액방식": "", "면책기간": 0, "적립금지급여부": 0, "확인필요": "", "근거_감액": "", "근거_면책": "보장개시일 문구 없음 → 0", "근거_적립금": "반복 지급", "원문_지급사유": "질병으로 수술을 받았을 때 (수술 1회당)", "원문_지급금액": "1구좌당 50만원"}], "failed": []}}</script>
+<script type="application/json" id="sample-compare">{"log": ["[변경 전]", "  compare_before.docx: 특약 4개, 급부 14개", "[변경 후]", "  compare_after.docx: 특약 5개, 급부 15개", "급부: 변경 3 / 신설 2 / 삭제 1 / 동일 10", "특약: 신설 1 / 삭제 0 / 이름 변경 1", "본문 문장: 변경 2 / 추가 1 / 삭제 0"], "data": {"file_before": "compare_before.docx", "file_after": "compare_after.docx", "counts": {"변경": 3, "신설": 2, "삭제": 1, "동일": 10}, "product_counts": {"신설": 1, "삭제": 0, "이름 변경": 1}, "body_counts": {"변경": 2, "추가": 1, "삭제": 0}, "products": [{"특약명(변경 전)": "무배당 암진단특약", "특약명(변경 후)": "무배당 암진단특약Ⅱ", "상태": "이름 변경", "급부 변경": 3, "급부 신설": 1, "급부 삭제": 0, "급부 동일": 1}, {"특약명(변경 전)": "무배당 상해보장특약", "특약명(변경 후)": "무배당 상해보장특약", "상태": "동일", "급부 변경": 0, "급부 신설": 0, "급부 삭제": 1, "급부 동일": 3}, {"특약명(변경 전)": "무배당 예제저축특약", "특약명(변경 후)": "무배당 예제저축특약", "상태": "동일", "급부 변경": 0, "급부 신설": 0, "급부 삭제": 0, "급부 동일": 4}, {"특약명(변경 전)": "무배당 예제구좌형특약", "특약명(변경 후)": "무배당 예제구좌형특약", "상태": "동일", "급부 변경": 0, "급부 신설": 0, "급부 삭제": 0, "급부 동일": 2}, {"특약명(변경 전)": "", "특약명(변경 후)": "무배당 예제간병특약", "상태": "신설", "급부 변경": 0, "급부 신설": 1, "급부 삭제": 0, "급부 동일": 0}], "benefits": [{"status": "변경", "product_before": "무배당 암진단특약", "product_after": "무배당 암진단특약Ⅱ", "name": "암진단비", "article_before": "제3조", "article_after": "제3조", "changes": [{"field": "면책기간", "before": "90", "after": "91", "diff": [["del", "90"], ["ins", "91"]]}], "before": {"지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "지급금액": "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "1년 미만 0.5(절대값)", "면책기간": "90", "적립금지급여부": "1"}, "after": {"지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정 되었을 때 (최초 1회한)", "지급금액": "보험가입금액 (다만, 계약일부터 1년미만 진단확정시 보험가입금액의 50% 지급)", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "1년 미만 0.5(절대값)", "면책기간": "91", "적립금지급여부": "1"}, "table_before": "【별표1】 암진단특약 보험금 지급기준표", "table_after": "【별표1】 암진단특약 보험금 지급기준표"}, {"status": "변경", "product_before": "무배당 암진단특약", "product_after": "무배당 암진단특약Ⅱ", "name": "유사암진단비", "article_before": "제4조", "article_after": "제4조", "changes": [{"field": "지급금액", "before": "보험가입금액의 20%", "after": "보험가입금액의 30%", "diff": [["eq", "보험가입금액의"], ["del", "20%"], ["ins", "30%"]]}, {"field": "지급율", "before": "0.2", "after": "0.3", "diff": [["del", "0.2"], ["ins", "0.3"]]}], "before": {"지급사유": "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "지급금액": "보험가입금액의 20%", "산출기준": "01", "지급율": "0.2", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "after": {"지급사유": "피보험자가 이 특약의 보장개시일 이후에 기타피부암, 갑상선암으로 진단확정 되었을 때 (각각 최초 1회한)", "지급금액": "보험가입금액의 30%", "산출기준": "01", "지급율": "0.3", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "table_before": "【별표1】 암진단특약 보험금 지급기준표", "table_after": "【별표1】 암진단특약 보험금 지급기준표"}, {"status": "변경", "product_before": "무배당 암진단특약", "product_after": "무배당 암진단특약Ⅱ", "name": "암입원비", "article_before": "제5조", "article_after": "제5조", "changes": [{"field": "면책기간", "before": "90", "after": "91", "diff": [["del", "90"], ["ins", "91"]]}], "before": {"지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "지급금액": "1일당 보험가입금액의 2%", "산출기준": "01", "지급율": "0.02", "지급주기": "100", "감액": "", "면책기간": "90", "적립금지급여부": "0"}, "after": {"지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 그 치료를 직접목적으로 입원하였을 때 (3일 초과 1일당, 120일 한도)", "지급금액": "1일당 보험가입금액의 2%", "산출기준": "01", "지급율": "0.02", "지급주기": "100", "감액": "", "면책기간": "91", "적립금지급여부": "0"}, "table_before": "【별표1】 암진단특약 보험금 지급기준표", "table_after": "【별표1】 암진단특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 암진단특약", "product_after": "무배당 암진단특약Ⅱ", "name": "암직접치료통원비", "article_before": "제6조", "article_after": "제6조", "changes": [], "before": {"지급사유": "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "지급금액": "보험가입금액의 1%", "산출기준": "01", "지급율": "0.01", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": {"지급사유": "피보험자가 암의 직접치료를 목적으로 통원하였을 때 (통원 1회당, 연간 30회 한도)", "지급금액": "보험가입금액의 1%", "산출기준": "01", "지급율": "0.01", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "table_before": "【별표1】 암진단특약 보험금 지급기준표", "table_after": "【별표1】 암진단특약 보험금 지급기준표"}, {"status": "신설", "product_before": "무배당 암진단특약", "product_after": "무배당 암진단특약Ⅱ", "name": "표적항암약물치료비", "article_before": "", "article_after": "제5조의2", "changes": [], "before": null, "after": {"지급사유": "피보험자가 이 특약의 암보장개시일 이후에 암으로 진단확정되고 표적항암약물허가치료를 받았을 때 (최초 1회한)", "지급금액": "보험가입금액의 100%", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "91", "적립금지급여부": "1"}, "table_before": "", "table_after": "【별표1】 암진단특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 상해보장특약", "product_after": "무배당 상해보장특약", "name": "상해사망보험금", "article_before": "", "article_after": "", "changes": [], "before": {"지급사유": "보험기간 중 상해의 직접결과로써 사망하였을 때", "지급금액": "1,000만원", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "after": {"지급사유": "보험기간 중 상해의 직접결과로써 사망하였을 때", "지급금액": "1,000만원", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "table_before": "【별표2】 상해보장특약 보험금 지급기준표", "table_after": "【별표2】 상해보장특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 상해보장특약", "product_after": "무배당 상해보장특약", "name": "상해수술비", "article_before": "", "article_after": "", "changes": [], "before": {"지급사유": "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "지급금액": "100만원", "산출기준": "01", "지급율": "0.1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": {"지급사유": "보험기간 중 상해로 그 치료를 직접목적으로 수술을 받았을 때 (수술 1회당)", "지급금액": "100만원", "산출기준": "01", "지급율": "0.1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "table_before": "【별표2】 상해보장특약 보험금 지급기준표", "table_after": "【별표2】 상해보장특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 상해보장특약", "product_after": "무배당 상해보장특약", "name": "상해후유장해보험금", "article_before": "", "article_after": "", "changes": [], "before": {"지급사유": "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "지급금액": "1,000만원 × 장해지급률", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": ""}, "after": {"지급사유": "보험기간 중 상해로 장해분류표에서 정한 장해지급률에 해당하는 장해상태가 되었을 때", "지급금액": "1,000만원 × 장해지급률", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": ""}, "table_before": "【별표2】 상해보장특약 보험금 지급기준표", "table_after": "【별표2】 상해보장특약 보험금 지급기준표"}, {"status": "삭제", "product_before": "무배당 상해보장특약", "product_after": "무배당 상해보장특약", "name": "골절진단비", "article_before": "", "article_after": "", "changes": [], "before": {"지급사유": "보험기간 중 상해로 골절로 진단확정 되었을 때 (사고 1회당)", "지급금액": "30만원", "산출기준": "01", "지급율": "0.03", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": null, "table_before": "【별표2】 상해보장특약 보험금 지급기준표", "table_after": ""}, {"status": "동일", "product_before": "무배당 예제저축특약", "product_after": "무배당 예제저축특약", "name": "사망보험금", "article_before": "제3조", "article_after": "제3조", "changes": [], "before": {"지급사유": "보험기간 중 피보험자가 사망하였을 때", "지급금액": "MAX(보험가입금액, 기납입보험료 합계) × 추가설계 사망보험금 비율", "산출기준": "10", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "after": {"지급사유": "보험기간 중 피보험자가 사망하였을 때", "지급금액": "MAX(보험가입금액, 기납입보험료 합계) × 추가설계 사망보험금 비율", "산출기준": "10", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "table_before": "【별표3】 예제저축특약 보험금 지급기준표", "table_after": "【별표3】 예제저축특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 예제저축특약", "product_after": "무배당 예제저축특약", "name": "만기환급금", "article_before": "제4조", "article_after": "제4조", "changes": [], "before": {"지급사유": "보험기간이 끝날 때까지 피보험자가 살아 있을 때", "지급금액": "기납입보험료의 100%", "산출기준": "03", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": ""}, "after": {"지급사유": "보험기간이 끝날 때까지 피보험자가 살아 있을 때", "지급금액": "기납입보험료의 100%", "산출기준": "03", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": ""}, "table_before": "【별표3】 예제저축특약 보험금 지급기준표", "table_after": "【별표3】 예제저축특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 예제저축특약", "product_after": "무배당 예제저축특약", "name": "중도급부금", "article_before": "제5조", "article_after": "제5조", "changes": [], "before": {"지급사유": "계약일부터 10년 경과시점에 피보험자가 살아 있을 때", "지급금액": "[월납] 월납보험료의 50%", "산출기준": "02", "지급율": "0.5", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "after": {"지급사유": "계약일부터 10년 경과시점에 피보험자가 살아 있을 때", "지급금액": "[월납] 월납보험료의 50%", "산출기준": "02", "지급율": "0.5", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "table_before": "【별표3】 예제저축특약 보험금 지급기준표", "table_after": "【별표3】 예제저축특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 예제저축특약", "product_after": "무배당 예제저축특약", "name": "생활자금", "article_before": "제6조", "article_after": "제6조", "changes": [], "before": {"지급사유": "계약일부터 10년 경과시점부터 매월 계약해당일에 피보험자가 살아 있을 때 (120회 한도)", "지급금액": "보험가입금액의 1%", "산출기준": "01", "지급율": "0.01", "지급주기": "211", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": {"지급사유": "계약일부터 10년 경과시점부터 매월 계약해당일에 피보험자가 살아 있을 때 (120회 한도)", "지급금액": "보험가입금액의 1%", "산출기준": "01", "지급율": "0.01", "지급주기": "211", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "table_before": "【별표3】 예제저축특약 보험금 지급기준표", "table_after": "【별표3】 예제저축특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 예제구좌형특약", "product_after": "무배당 예제구좌형특약", "name": "질병입원일당", "article_before": "제3조", "article_after": "제3조", "changes": [], "before": {"지급사유": "질병으로 4일 이상 계속 입원하였을 때 (3일 초과 1일당)", "지급금액": "1구좌당 2만원", "산출기준": "95", "지급율": "0.002", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": {"지급사유": "질병으로 4일 이상 계속 입원하였을 때 (3일 초과 1일당)", "지급금액": "1구좌당 2만원", "산출기준": "95", "지급율": "0.002", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "table_before": "【별표4】 예제구좌형특약 보험금 지급기준표", "table_after": "【별표4】 예제구좌형특약 보험금 지급기준표"}, {"status": "동일", "product_before": "무배당 예제구좌형특약", "product_after": "무배당 예제구좌형특약", "name": "질병수술비", "article_before": "제4조", "article_after": "제4조", "changes": [], "before": {"지급사유": "질병으로 수술을 받았을 때 (수술 1회당)", "지급금액": "1구좌당 50만원", "산출기준": "95", "지급율": "0.05", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "after": {"지급사유": "질병으로 수술을 받았을 때 (수술 1회당)", "지급금액": "1구좌당 50만원", "산출기준": "95", "지급율": "0.05", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "0"}, "table_before": "【별표4】 예제구좌형특약 보험금 지급기준표", "table_after": "【별표4】 예제구좌형특약 보험금 지급기준표"}, {"status": "신설", "product_before": "", "product_after": "무배당 예제간병특약", "name": "간병자금", "article_before": "", "article_after": "제3조", "changes": [], "before": null, "after": {"지급사유": "장기요양등급 1등급 판정을 받았을 때 (최초 1회한)", "지급금액": "보험가입금액의 100%", "산출기준": "01", "지급율": "1", "지급주기": "100", "감액": "", "면책기간": "0", "적립금지급여부": "1"}, "table_before": "", "table_after": "【별표5】 예제간병특약 보험금 지급기준표"}], "body": [{"kind": "변경", "product": "무배당 암진단특약Ⅱ", "article": "제2조(암보장개시일)", "before": "제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 90일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "after": "제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여 91일이 지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다.", "diff": [["eq", "제2조(암보장개시일) 회사의 암에 대한 보장개시일은 계약일부터 그 날을 포함하여"], ["del", "90일이"], ["ins", "91일이"], ["eq", "지난 날의 다음날로 하며, 이를 암보장개시일이라 합니다."]]}, {"kind": "변경", "product": "무배당 상해보장특약", "article": "제1조(보험금의 지급사유)", "before": "제1조(보험금의 지급사유) 회사는 피보험자에게 다음 중 어느 하나의 사유가 발생한 경우에는 보험금을 지급합니다.", "after": "제1조(보험금의 지급사유) 회사는 피보험자에게 다음 중 어느 하나의 사유가 발생한 경우에는 별표2에서 정한 보험금을 지급합니다.", "diff": [["eq", "제1조(보험금의 지급사유) 회사는 피보험자에게 다음 중 어느 하나의 사유가 발생한 경우에는"], ["ins", "별표2에서 정한"], ["eq", "보험금을 지급합니다."]]}, {"kind": "추가", "product": "무배당 예제간병특약", "article": "", "before": "", "after": "【별표5】 예제간병특약 보험금 지급기준표", "diff": null}], "body_total": 3}}</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const WORD_EXT = /\.(docx|docm|doc|pdf)$/i;
+  const XLSX_EXT = /\.(xlsx|xlsm)$/i;
+  const LONG_COLS = new Set(["확인필요", "급부목록", "근거_기준금액", "근거_감액", "근거_면책", "근거_적립금", "원문_지급사유",
+    "원문_지급금액", "경로", "결과", "별표명", "비고", "설명", "급부명", "급부코드", "상품명", "매칭근거", "급부코드명", "약관급부명"]);
+  const NAMES = { extract: "약관에서 추출", revise: "개정 후 자동화", info: "약관 정보", compare: "약관 비교" };
+  const ORDER = ["info", "compare", "extract", "revise"];
+
+  // 기능별 설정
+  const TOOLS = {
+    extract: {
+      p: "x",
+      legend: [["#FFF2CC", "확인필요 (엑셀에서도 노란색)"]],
+      sampleFile: "sample/sample_policy.docx",
+      sampleNote: "↑ 예제 약관을 실행한 기록입니다. 약관 파일을 고른 뒤 [실행]을 누르세요.",
+      doneMsg: "통계테이블 초안을 만들었습니다. 아래 결과를 확인하고 엑셀로 내려받으세요.",
+      stats(sheets) {
+        const by = (n) => sheets.find((s) => s.name === n);
+        const draft = by("초안"), raw = by("급부원문"), st = by("처리결과");
+        const ok = st ? st.rows.filter((r) => r[st.columns.indexOf("결과")] === "성공").length : 0;
+        return [
+          ["파일", st ? `${ok}/${st.total}` : "0", "성공"],
+          ["급부", raw ? raw.total : 0, "개"],
+          ["초안", draft ? draft.total : 0, "행"],
+          ["확인필요", draft ? draft.colors.filter(Boolean).length : 0, "행", true],
+        ];
+      },
+    },
+    revise: {
+      p: "r",
+      legend: [["#FFF2CC", "확인필요"], ["#F8CBAD", "기존 행 없음 · 주보종 모름"], ["#DDEBF7", "신규(변경전 없음)"]],
+      sampleFile: "sample/sample_revision.xlsx",
+      sampleNote: "↑ 예제 양식을 실행한 기록입니다. 양식 엑셀을 고른 뒤 [실행]을 누르세요.",
+      doneMsg: "개정 후 통계테이블을 채웠습니다. 색 표시된 상품을 확인하고 엑셀로 내려받으세요.",
+      stats(sheets) {
+        const sum = sheets.find((s) => s.name === "검토_요약");
+        const get = (k) => {
+          const r = sum && sum.rows.find((x) => x[0] === k);
+          return r ? r[1] : 0;
+        };
+        const out = [
+          ["작성 대상", get("작성 대상(변경후 코드)"), "개"],
+          ["작성", get("작성된 행 수"), "행"],
+          ["완료", get("완료"), "건"],
+          ["확인필요", get("확인필요"), "건", true],
+          ["기존 행 없음", get("기존 행 없음"), "건", true],
+          ["신규", get("신규(변경전 없음)"), "건", true],
+          ["주보종 모름", get("주보종 모름"), "건", true],
+        ];
+        if (get("보류 행 수")) out.push(["보류", get("보류 행 수"), "행", true]);
+        return out;
+      },
+    },
+    info: {
+      p: "i",
+      view: "info",
+      sampleFile: "sample/sample_policy.docx",
+      sampleNote: "↑ 예제 약관을 요약한 기록입니다. 약관 파일을 고른 뒤 [요약 보기]를 누르세요.",
+      doneMsg: "급부별 요약을 만들었습니다. 노란 표시는 약관 원문을 확인하세요.",
+    },
+    compare: {
+      p: "c",
+      view: "compare",
+      sampleNote: "↑ 예제 약관(변경 전·후)을 비교한 기록입니다. 두 약관을 고른 뒤 [비교 실행]을 누르세요.",
+      doneMsg: "비교를 마쳤습니다. 아래에서 달라진 점을 확인하고 엑셀로 내려받으세요.",
+    },
+  };
+  for (const [k, t] of Object.entries(TOOLS)) Object.assign(t, { key: k, files: [], code: null, result: null, sheet: 0, onlyMarked: false });
+
+  let worker = null;
+  let engineReady = false;
+  let busy = null;          // 실행 중인 기능 ("extract" | "revise" | null)
+  let current = "extract";
+
+  // ---------- 화면 공통 ----------
+  function setEngine(state, text) {
+    $("engine").dataset.state = state;
+    $("engine-text").textContent = text;
+  }
+  function showMsg(t, text, kind) {
+    const m = $(t.p + "-msg");
+    if (!text) { m.hidden = true; return; }
+    m.textContent = text;
+    m.className = "notice" + (kind ? " " + kind : "");
+    m.hidden = false;
+  }
+  function logLine(t, text, cls) {
+    const box = $(t.p + "-log");
+    const line = document.createElement("div");
+    if (cls) line.className = cls;
+    line.textContent = text;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+  function refreshButtons() {
+    for (const t of Object.values(TOOLS)) {
+      $(t.p + "-run").disabled = !engineReady || !!busy || !t.files.length;
+      $(t.p + "-sample").disabled = !engineReady || !!busy;
+      $(t.p + "-pick-file").disabled = busy === t.key;
+    }
+    $("x-stop").disabled = busy !== "extract";
+    for (const id of ["x-pick-dir", "x-pick-code", "x-clear-code"]) $(id).disabled = busy === "extract";
+    $("i-pick-dir").disabled = busy === "info";
+    $("c-pick-file2").disabled = busy === "compare";
+  }
+
+  // ---------- 기능 탭 ----------
+  function selectTool(key, focus) {
+    if (!TOOLS[key]) key = "extract";
+    current = key;
+    for (const k of Object.keys(TOOLS)) {
+      const on = k === key;
+      $("panel-" + k).hidden = !on;
+    }
+    document.querySelectorAll("[data-tool-link]").forEach((a) => {
+      a.classList.toggle("cur", a.dataset.toolLink === key);
+      if (a.dataset.toolLink === key) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+    if ($("crumb-tool")) $("crumb-tool").textContent = NAMES[key];
+
+  }
+  // ---------- 처음 화면 ↔ 기능 화면 (주소의 #extract 등으로 구분, 뒤로 가기 = 처음 화면) ----------
+  function route() {
+    const key = location.hash.slice(1);
+    const inTool = !!TOOLS[key];
+    $("home").hidden = inTool;
+    $("app").hidden = !inTool;
+    document.body.dataset.view = inTool ? "tool" : "home";
+    if (inTool) selectTool(key);
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll(".tile").forEach((b) => b.addEventListener("click", () => { location.hash = b.dataset.tool; }));
+  window.addEventListener("hashchange", route);
+
+  // ---------- 실행 엔진 (브라우저 안 Python) ----------
+  function startWorker() {
+    engineReady = false;
+    setEngine("loading", "준비 중");
+    refreshButtons();
+    worker = new Worker("worker.js");
+    worker.onmessage = (ev) => {
+      const d = ev.data;
+      if (d.type === "status") setEngine("loading", "준비 중 · " + d.text);
+      else if (d.type === "ready") { engineReady = true; setEngine("ready", "준비됨"); refreshButtons(); }
+      else if (d.type === "fatal") {
+        setEngine("fail", "준비 실패");
+        for (const t of Object.values(TOOLS)) showMsg(t, "프로그램을 준비하지 못했습니다 (" + d.message + "). 인터넷 연결을 확인하고 새로고침해 주세요.", "err");
+      }
+      else if (d.type === "log" && busy) logLine(TOOLS[busy], d.m);
+      else if (d.type === "done") finishRun(TOOLS[d.tool], d);
+      else if (d.type === "error") failRun(TOOLS[d.tool], d.message);
+    };
+    worker.onerror = (e) => {
+      setEngine("fail", "준비 실패");
+      for (const t of Object.values(TOOLS)) showMsg(t, "프로그램을 준비하지 못했습니다" + (e.message ? " (" + e.message + ")" : "") + ". 새로고침해 주세요.", "err");
+      e.preventDefault();
+    };
+  }
+
+  async function run(t, files, code) {
+    if (!engineReady || busy) return;
+    showMsg(t, "");
+    busy = t.key;
+    setEngine("busy", "실행 중");
+    refreshButtons();
+    $(t.p + "-log").textContent = "";
+    logLine(t, { extract: "추출 시작...", revise: "작성 시작...", info: "요약 시작...", compare: "비교 시작..." }[t.key]);
+    try {
+      const payload = await Promise.all(files.map(async (f) => ({ path: f.path, data: await f.file.arrayBuffer() })));
+      const codePayload = code ? { name: code.name, data: await code.arrayBuffer() } : null;
+      const transfer = payload.map((p) => p.data).concat(codePayload ? [codePayload.data] : []);
+      worker.postMessage({ type: "run", tool: t.key, files: payload, code: codePayload }, transfer);
+    } catch (e) {
+      failRun(t, "파일을 읽지 못했습니다: " + e.message);
+    }
+  }
+  function finishRun(t, d) {
+    busy = null;
+    setEngine("ready", "준비됨");
+    refreshButtons();
+    if (t.view === "info") setInfo(t, JSON.parse(d.info), false);
+    else if (t.view === "compare") setCompare(t, JSON.parse(d.sheets), new Blob([d.xlsx]), d.name, false);
+    else setResult(t, { name: d.name, sheets: JSON.parse(d.sheets), xlsx: new Blob([d.xlsx]), sample: false });
+    showMsg(t, t.doneMsg);
+    $(t.p + "-result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
+  function failRun(t, message) {
+    busy = null;
+    setEngine("ready", "준비됨");
+    refreshButtons();
+    logLine(t, "오류: " + message, "err");
+    showMsg(t, message, "err");
+  }
+
+  $("x-stop").addEventListener("click", () => {
+    if (busy !== "extract") return;
+    worker.terminate();
+    busy = null;
+    logLine(TOOLS.extract, "중단했습니다. 처리 중이던 결과는 저장되지 않습니다.", "dim");
+    showMsg(TOOLS.extract, "중단했습니다. 다시 실행할 수 있게 준비하는 중입니다.", "warn");
+    startWorker();
+  });
+
+  // ---------- 파일 고르기 ----------
+  function setSource(t, list, label) {
+    const ok = t.key === "revise" ? XLSX_EXT : WORD_EXT;
+    let usable = list.filter((f) => ok.test(f.path) && !f.path.split("/").pop().startsWith("~$"));
+    if (t.key === "revise") usable = usable.slice(0, 1);
+    if (!list.length) return;
+    t.files = usable;
+    $(t.p + "-src-field").classList.remove("empty");
+    if (!usable.length) {
+      $(t.p + "-src-text").textContent = label + (t.key !== "revise" ? " (PDF·Word 파일 없음)" : " (엑셀 파일 아님)");
+      showMsg(t, t.key !== "revise" ? "고른 곳에서 PDF·Word 약관을 찾지 못했습니다." : "양식은 엑셀(.xlsx) 파일이어야 합니다.", "warn");
+    } else {
+      $(t.p + "-src-text").textContent = usable.length === 1 ? usable[0].path : `${label} · PDF·Word ${usable.length}개`;
+      showMsg(t, "");
+    }
+    refreshButtons();
+  }
+  const pick = (btn, input) => $(btn).addEventListener("click", () => $(input).click());
+  pick("x-pick-file", "x-in-file");
+  pick("x-pick-dir", "x-in-dir");
+  pick("x-pick-code", "x-in-code");
+  pick("r-pick-file", "r-in-file");
+  pick("i-pick-file", "i-in-file");
+  pick("i-pick-dir", "i-in-dir");
+  for (const [input, t] of [["x-in-dir", TOOLS.extract], ["i-in-dir", TOOLS.info]]) {
+    $(input).addEventListener("change", (e) => {
+      const files = [...e.target.files];
+      if (files.length) {
+        const root = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+        setSource(t, files.map((f) => ({ path: f.webkitRelativePath || f.name, file: f })), root + "/");
+      }
+      e.target.value = "";
+    });
+  }
+  for (const [input, t] of [["x-in-file", TOOLS.extract], ["r-in-file", TOOLS.revise], ["i-in-file", TOOLS.info]]) {
+    $(input).addEventListener("change", (e) => {
+      const files = [...e.target.files];
+      if (files.length) setSource(t, files.map((f) => ({ path: f.name, file: f })), files.length === 1 ? files[0].name : "선택한 파일");
+      e.target.value = "";
+    });
+  }
+  $("x-in-code").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (f) {
+      TOOLS.extract.code = f;
+      $("x-code-field").classList.remove("empty");
+      $("x-code-text").textContent = f.name;
+      $("x-clear-code").hidden = false;
+    }
+    e.target.value = "";
+  });
+  $("x-clear-code").addEventListener("click", () => {
+    TOOLS.extract.code = null;
+    $("x-code-field").classList.add("empty");
+    $("x-code-text").textContent = "엑셀·CSV · CD_ID(급부코드), CD_NM(급부명) 칼럼";
+    $("x-clear-code").hidden = true;
+  });
+
+  // 끌어다 놓기 (폴더도 가능)
+  async function readEntry(entry, prefix, out) {
+    if (entry.isFile) {
+      const file = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({ path: prefix + file.name, file });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let batch;
+      do {
+        batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+        for (const e of batch) await readEntry(e, prefix + entry.name + "/", out);
+      } while (batch.length);
+    }
+  }
+  // 약관 비교: 변경 전 · 후 파일 하나씩
+  function setCompareFile(which, file) {
+    const t = TOOLS.compare;
+    if (!WORD_EXT.test(file.name)) { showMsg(t, "PDF나 Word 약관을 골라 주세요.", "warn"); return; }
+    t[which] = file;
+    const id = which === "before" ? "c-src" : "c-src2";
+    $(id + "-field").classList.remove("empty");
+    $(id + "-text").textContent = file.name;
+    t.files = t.before && t.after ? [{ path: "before/" + t.before.name, file: t.before }, { path: "after/" + t.after.name, file: t.after }] : [];
+    showMsg(t, "");
+    refreshButtons();
+  }
+  pick("c-pick-file", "c-in-file");
+  pick("c-pick-file2", "c-in-file2");
+  for (const [input, which, zoneId] of [["c-in-file", "before", "c-src-field"], ["c-in-file2", "after", "c-src2-field"]]) {
+    $(input).addEventListener("change", (e) => { if (e.target.files[0]) setCompareFile(which, e.target.files[0]); e.target.value = ""; });
+    const zone = $(zoneId);
+    ["dragenter", "dragover"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove("drag")));
+    zone.addEventListener("drop", (e) => { e.preventDefault(); if (busy !== "compare" && e.dataTransfer.files[0]) setCompareFile(which, e.dataTransfer.files[0]); });
+  }
+
+  for (const t of Object.values(TOOLS)) {
+    if (t.key === "compare") continue;
+    const zone = $(t.p + "-src-field");
+    ["dragenter", "dragover"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove("drag")));
+    zone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      if (busy === t.key) return;
+      const items = [...(e.dataTransfer.items || [])].map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+      const out = [];
+      if (items.length) for (const it of items) await readEntry(it, "", out);
+      else for (const f of e.dataTransfer.files) out.push({ path: f.name, file: f });
+      const dirs = items.filter((i) => i.isDirectory);
+      setSource(t, out, dirs.length === 1 && items.length === 1 ? dirs[0].name + "/" : out.length === 1 ? out[0].path : "끌어다 놓은 파일");
+    });
+  }
+
+  // 예제 파일 (.docx/.xlsx 를 내보내지 않는 곳에서는 base64 글자 파일로 올려 둠)
+  async function sampleBlob(path) {
+    const r = await fetch(path).catch(() => null);
+    if (r && r.ok) return r.blob();
+    const t = await fetch(path + ".txt");
+    if (!t.ok) throw new Error(t.status);
+    return new Blob([Uint8Array.from(atob((await t.text()).trim()), (c) => c.charCodeAt(0))]);
+  }
+  for (const t of Object.values(TOOLS)) {
+    $(t.p + "-run").addEventListener("click", () => {
+      if (!t.files.length) { showMsg(t, t.key !== "revise" ? "약관 파일을 선택해 주세요." : "양식 엑셀을 선택해 주세요.", "warn"); return; }
+      run(t, t.files, t.key === "extract" ? t.code : null);
+    });
+    $(t.p + "-sample").addEventListener("click", async () => {
+      if (t.key === "compare") {
+        try {
+          const files = [];
+          for (const [dir, name] of [["before", "compare_before.docx"], ["after", "compare_after.docx"]])
+            files.push({ path: `${dir}/${name}`, file: new File([await sampleBlob("sample/" + name)], name) });
+          run(t, files, null);
+        } catch (e) {
+          showMsg(t, "예제 파일을 불러오지 못했습니다.", "err");
+        }
+        return;
+      }
+      try {
+        const name = t.sampleFile.split("/").pop();
+        const file = new File([await sampleBlob(t.sampleFile)], name);
+        run(t, [{ path: name, file }], null);
+      } catch (e) {
+        showMsg(t, "예제 파일을 불러오지 못했습니다.", "err");
+      }
+    });
+  }
+  $("r-template").addEventListener("click", async () => {
+    try {
+      await saveFile(TOOLS.revise, await sampleBlob(TOOLS.revise.sampleFile), "통계테이블_자동작성_예제양식.xlsx");
+    } catch (e) {
+      showMsg(TOOLS.revise, "예제 양식을 불러오지 못했습니다.", "err");
+    }
+  });
+
+  // ---------- 결과 보기 ----------
+  function fmt(v) { return v === null || v === undefined ? "" : String(v); }
+  function buildView(t) {
+    const v = $(t.p + "-view");
+    v.innerHTML = `
+      <div class="result-bar">
+        <div style="min-width:0"><div class="fname"></div><div class="stats"></div></div>
+        <button type="button" class="primary dl">엑셀 내려받기</button>
+      </div>
+      <div class="sheet">
+        <div class="tabs" role="tablist"></div>
+        <div class="sheet-tools">
+          <span class="legend"></span>
+          <label><input type="checkbox" class="only"> 색 표시된 행만 보기</label>
+        </div>
+        <div class="grid-wrap" role="tabpanel"></div>
+        <div class="more" hidden></div>
+      </div>`;
+    const legend = v.querySelector(".legend");
+    for (const [color, label] of t.legend) {
+      const s = document.createElement("span");
+      s.innerHTML = "<i></i>";
+      s.firstChild.style.background = color;
+      s.append(label);
+      legend.appendChild(s);
+    }
+    v.querySelector(".only").addEventListener("change", (e) => { t.onlyMarked = e.target.checked; renderGrid(t); });
+    v.querySelector(".dl").addEventListener("click", () => {
+      if (t.result && t.result.xlsx) saveFile(t, t.result.xlsx, t.result.name);
+    });
+  }
+  function setResult(t, r) {
+    t.result = r;
+    t.sheet = 0;
+    const v = $(t.p + "-view");
+    $(t.p + "-tag").hidden = !r.sample;
+    v.querySelector(".fname").textContent = r.name;
+    const dl = v.querySelector(".dl");
+    dl.disabled = !r.xlsx;
+    dl.title = r.xlsx ? "" : "예제 결과는 미리보기만 됩니다. [예제로 해 보기]를 누르면 엑셀을 내려받을 수 있습니다.";
+    const stats = v.querySelector(".stats");
+    stats.textContent = "";
+    for (const [k, val, unit, warn] of t.stats(r.sheets)) {
+      const s = document.createElement("span");
+      if (warn && Number(val) > 0) s.className = "chk";
+      s.append(k + " ");
+      const b = document.createElement("b");
+      b.textContent = val;
+      s.append(b, unit);
+      stats.appendChild(s);
+    }
+    renderTabs(t);
+    renderGrid(t);
+  }
+  function renderTabs(t) {
+    const tabs = $(t.p + "-view").querySelector(".tabs");
+    tabs.textContent = "";
+    t.result.sheets.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(i === t.sheet));
+      const name = document.createElement("span");
+      name.textContent = s.name;
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = s.total;
+      b.append(name, n);
+      b.addEventListener("click", () => { t.sheet = i; renderTabs(t); renderGrid(t); });
+      tabs.appendChild(b);
+    });
+  }
+  function renderGrid(t) {
+    const v = $(t.p + "-view");
+    const sheet = t.result.sheets[t.sheet];
+    const hasColor = sheet.colors.some(Boolean);
+    v.querySelector(".sheet-tools").hidden = !hasColor;
+    const only = hasColor && t.onlyMarked;
+    const grid = v.querySelector(".grid-wrap");
+    grid.textContent = "";
+    const rows = sheet.rows.map((r, i) => [r, i]).filter(([, i]) => !only || sheet.colors[i]);
+    const more = v.querySelector(".more");
+    more.hidden = sheet.total <= sheet.rows.length;
+    more.textContent = `미리보기는 앞 ${sheet.rows.length.toLocaleString()}행만 보여 줍니다. 엑셀에는 ${sheet.total.toLocaleString()}행 모두 들어 있습니다.`;
+    if (!rows.length) {
+      const p = document.createElement("div");
+      p.className = "empty-sheet";
+      p.textContent = sheet.rows.length ? "색 표시된 행이 없습니다." : "이 시트에 행이 없습니다.";
+      grid.appendChild(p);
+      return;
+    }
+    const table = document.createElement("table");
+    const head = table.createTHead().insertRow();
+    const th0 = document.createElement("th");
+    th0.className = "rowno";
+    head.appendChild(th0);
+    for (const c of sheet.columns) {
+      const th = document.createElement("th");
+      th.textContent = c;
+      head.appendChild(th);
+    }
+    const tb = table.createTBody();
+    for (const [r, i] of rows) {
+      const tr = tb.insertRow();
+      const color = sheet.colors[i];
+      if (color) tr.className = "marked";
+      const n = tr.insertCell();
+      n.className = "rowno";
+      n.textContent = i + 1;
+      r.forEach((val, j) => {
+        const td = tr.insertCell();
+        td.textContent = fmt(val);
+        if (color) td.style.background = color;
+        if (typeof val === "number") td.className = "num";
+        else if (LONG_COLS.has(sheet.columns[j]) && String(val || "").length > 24) td.className = "long";
+      });
+    }
+    grid.appendChild(table);
+  }
+
+  // ---------- 약관 정보 (급부별 요약) ----------
+  // 산출기준 코드표 (benefit_extractor2.py 의 CALC_BASIS_CODES 와 같음)
+  const BASIS = {
+    "01": "보험가입금액", "02": "보험료", "03": "기납입보험료",
+    "10": "MAX(가입금액, 기납입보험료) × 추가설계 비율",
+    "95": "1구좌(보험료 1천만원)", "96": "1구좌(보험료 1억원)", "97": "1구좌(보험료 5천만원)", "98": "1구좌(보험료 100만원)",
+    "확인": "산출기준 확인 필요",
+  };
+  const UNIT_CODES = new Set(["95", "96", "97", "98"]);
+  const pct = (x) => (x === null || x === undefined ? "?" : Math.round(x * 10000) / 100 + "%");
+  const won = (v) => (v % 10000 === 0 ? (v / 10000).toLocaleString() + "만원" : v.toLocaleString() + "원");
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  };
+  function evidence(s) {
+    if (!s) return null;
+    const t = String(s).replace(/^(특약본문|약관전체|\(주\)):\s*/, "");
+    const e = el("span", "sub", "근거: " + (t.length > 40 ? t.slice(0, 40) + "…" : t));
+    e.title = String(s);
+    return e;
+  }
+  function amountCell(b) {
+    const td = el("td", "amt");
+    td.appendChild(el("span", "main", b["원문_지급금액"] || ""));
+    const parts = [];
+    const code = b["산출기준"] || "?";
+    parts.push(`산출기준 ${code === "확인" ? "" : code + " "}${BASIS[code] || ""} × ${pct(b["기본지급율"])}`);
+    if (b["기준금액(원)"] && !UNIT_CODES.has(code)) parts.push("기준 가입금액 " + won(b["기준금액(원)"]));
+    if (b["감액기간(년)"]) {
+      const reduced = b["감액방식"] === "절대값" ? b["감액비율"] : (b["기본지급율"] ?? 0) * b["감액비율"];
+      parts.push(`가입 ${b["감액기간(년)"]}년 미만 ${pct(reduced)}`);
+    }
+    parts.push(b["지급주기"] === "211" ? "지급주기 211 (n회 월지급)" : "지급주기 100");
+    td.appendChild(el("span", "sub", "통계테이블 값: " + parts.join(" · ")));
+    return td;
+  }
+  function setInfo(t, data, sample) {
+    t.info = data;
+    $("i-tag").hidden = !sample;
+    const bens = data.benefits || [];
+    const groups = new Map();
+    for (const b of bens) {
+      const k = b["파일명"] + "\u0000" + b["특약명"];
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(b);
+    }
+    const nChk = bens.filter((b) => b["확인필요"]).length;
+    const stats = $("i-stats");
+    stats.textContent = "";
+    const files = new Set(bens.map((b) => b["파일명"]));
+    for (const [k, v, unit, warn] of [["파일", files.size, "개"], ["특약", groups.size, "개"], ["급부", bens.length, "개"], ["확인필요", nChk, "개", true]]) {
+      const s = el("span", warn && v > 0 ? "chk" : "");
+      s.append(k + " ", el("b", "", v), unit);
+      stats.appendChild(s);
+    }
+    const view = $("i-view");
+    view.textContent = "";
+    for (const f of data.failed || []) {
+      const p = el("p", "notice err", `${f["파일명"]}: ${f["오류"]}`);
+      p.style.margin = "14px 0 0";
+      view.appendChild(p);
+    }
+    if (!bens.length) {
+      view.appendChild(el("div", "empty-sheet", "약관에서 보험금 지급기준표를 찾지 못했습니다."));
+      return;
+    }
+    for (const rows of groups.values()) {
+      const g = el("div", "prod");
+      g.appendChild(el("h3", "", rows[0]["특약명"]));
+      g.appendChild(el("div", "meta", [rows[0]["별표명"], rows[0]["파일명"], `급부 ${rows.length}개`].filter(Boolean).join(" · ")));
+      const wrap = el("div", "info-wrap");
+      const table = el("table", "info");
+      const hr = table.createTHead().insertRow();
+      for (const h of ["급부", "지급사유 (언제)", "지급금액 (얼마)", "면책기간", "적립금 지급"]) hr.appendChild(el("th", "", h));
+      const tb = table.createTBody();
+      for (const b of rows) {
+        const tr = tb.insertRow();
+        tr.dataset.q = (b["급부명"] + " " + b["특약명"]).toLowerCase();
+        // 급부
+        const c1 = el("td", "ben");
+        c1.appendChild(el("span", "main", b["급부명"]));
+        if (b["조항"]) c1.appendChild(el("span", "sub", b["조항"]));
+        if (b["확인필요"]) {
+          c1.appendChild(el("span", "flag", "확인필요"));
+          c1.appendChild(el("span", "memo", b["확인필요"]));
+        }
+        tr.appendChild(c1);
+        // 지급사유
+        tr.appendChild(el("td", "why", b["원문_지급사유"] || ""));
+        // 지급금액
+        tr.appendChild(amountCell(b));
+        // 면책기간
+        const c4 = el("td", "wait");
+        const w = b["면책기간"];
+        if (w === null || w === undefined) c4.appendChild(el("span", "unk", "확인필요"));
+        else c4.appendChild(el("span", "big", w > 0 ? `${w}일` : "없음"));
+        const ev = w > 0 ? evidence(b["근거_면책"]) : null;
+        if (ev) c4.appendChild(ev);
+        tr.appendChild(c4);
+        // 적립금
+        const c5 = el("td", "res");
+        const r = b["적립금지급여부"];
+        if (r === 1) c5.appendChild(el("span", "big yes", "지급"));
+        else if (r === 0) c5.appendChild(el("span", "big no", "미지급"));
+        else c5.appendChild(el("span", "unk", "확인필요"));
+        if (b["근거_적립금"]) c5.appendChild(el("span", "sub", b["근거_적립금"]));
+        tr.appendChild(c5);
+      }
+      wrap.appendChild(table);
+      g.appendChild(wrap);
+      view.appendChild(g);
+    }
+    applyFilter();
+  }
+  function applyFilter() {
+    const q = $("i-filter").value.trim().toLowerCase();
+    for (const g of $("i-view").querySelectorAll(".prod")) {
+      let any = false;
+      for (const tr of g.querySelectorAll("tbody tr")) {
+        const hit = !q || tr.dataset.q.includes(q);
+        tr.classList.toggle("hide", !hit);
+        any = any || hit;
+      }
+      g.hidden = !any;
+    }
+  }
+  $("i-filter").addEventListener("input", applyFilter);
+
+  // ---------- 약관 비교 결과 ----------
+  const pillCls = (s) => (s === "이름 변경" ? "이름" : s);
+  function diffNode(diff) {
+    const span = el("span", "diff");
+    for (const [k, txt] of diff || []) {
+      span.append(k === "eq" ? txt : el(k === "del" ? "del" : "ins", "", txt), " ");
+    }
+    return span;
+  }
+  function valuesList(vals) {
+    const dl = el("dl", "chg");
+    for (const [k, v] of Object.entries(vals || {})) {
+      if (!v) continue;
+      dl.append(el("dt", "", k), el("dd", "", v));
+    }
+    return dl;
+  }
+  function setCompare(t, r, xlsx, name, sample) {
+    t.cmp = { r, xlsx, name };
+    $("c-tag").hidden = !sample;
+    $("c-dl").disabled = !xlsx;
+    $("c-dl").title = xlsx ? "" : "예제 결과는 미리보기만 됩니다. [예제 약관(전·후)으로 해 보기]를 누르면 엑셀을 내려받을 수 있습니다.";
+    $("c-files").textContent = `변경 전: ${r.file_before}  →  변경 후: ${r.file_after}`;
+    const stats = $("c-stats");
+    stats.textContent = "";
+    const c = r.counts, pc = r.product_counts, bc = r.body_counts;
+    for (const [k, v, unit, warn] of [["급부 변경", c["변경"], "개", true], ["신설", c["신설"], "개", true], ["삭제", c["삭제"], "개", true],
+      ["동일", c["동일"], "개"], ["특약 신설·삭제", pc["신설"] + pc["삭제"], "개", true],
+      ["본문 문장 변경", bc["변경"] + bc["추가"] + bc["삭제"], "곳"]]) {
+      const s = el("span", warn && v > 0 ? "chk" : "");
+      s.append(k + " ", el("b", "", v), unit);
+      stats.appendChild(s);
+    }
+    const view = $("c-view");
+    view.textContent = "";
+    // 특약
+    const prodChanged = r.products.filter((p) => p["상태"] !== "동일");
+    if (prodChanged.length) {
+      const sec = el("div", "cmp-section");
+      sec.appendChild(el("h3", "", "특약(상품) 변경"));
+      const ul = el("ul", "cmp-list");
+      for (const p of prodChanged) {
+        const li = el("li");
+        const head = el("div", "cmp-head");
+        head.append(el("span", "pill " + pillCls(p["상태"]), p["상태"]));
+        if (p["상태"] === "이름 변경") head.append(diffNode([["del", p["특약명(변경 전)"]], ["ins", p["특약명(변경 후)"]]]));
+        else head.append(el("b", "", p["특약명(변경 후)"] || p["특약명(변경 전)"]));
+        li.append(head);
+        ul.appendChild(li);
+      }
+      sec.appendChild(ul);
+      view.appendChild(sec);
+    }
+    // 급부
+    const sec = el("div", "cmp-section");
+    const h = el("div", "cmp-head");
+    h.append(el("h3", "", "급부별 변경"));
+    const lab = el("label", "cmp-note");
+    const chk = el("input");
+    chk.type = "checkbox";
+    chk.id = "c-show-same";
+    lab.append(chk, " 바뀌지 않은 급부도 보기");
+    h.append(lab);
+    sec.appendChild(h);
+    const ul = el("ul", "cmp-list");
+    const order = { "변경": 0, "신설": 1, "삭제": 2, "동일": 3 };
+    for (const x of [...r.benefits].sort((a, b) => order[a.status] - order[b.status])) {
+      const li = el("li", x.status === "동일" ? "same hide" : "");
+      const head = el("div", "cmp-head");
+      const prod = x.product_after || x.product_before;
+      const art = x.article_after || x.article_before;
+      head.append(el("span", "pill " + x.status, x.status), el("b", "", x.name), el("small", "", [prod, art].filter(Boolean).join(" · ")));
+      li.append(head);
+      if (x.status === "변경") {
+        const dl = el("dl", "chg");
+        for (const ch of x.changes) dl.append(el("dt", "", ch.field), Object.assign(el("dd"), {}).appendChild(diffNode(ch.diff)).parentNode);
+        li.append(dl);
+      } else if (x.status === "신설") li.append(valuesList(x.after));
+      else if (x.status === "삭제") li.append(valuesList(x.before));
+      ul.appendChild(li);
+    }
+    if (!r.benefits.length) ul.appendChild(el("li", "", "두 약관 모두에서 지급기준표를 찾지 못했습니다."));
+    sec.appendChild(ul);
+    view.appendChild(sec);
+    chk.addEventListener("change", () => ul.querySelectorAll("li.same").forEach((li) => li.classList.toggle("hide", !chk.checked)));
+    // 본문
+    if (r.body.length) {
+      const det = el("details", "cmp-section cmp-body");
+      det.open = r.body.length <= 20;
+      det.appendChild(el("summary", "", `본문에서 바뀐 문장 ${r.body_total}곳 (지급기준표 밖)`));
+      const bl = el("ul", "cmp-list");
+      for (const b of r.body) {
+        const li = el("li");
+        const head = el("div", "cmp-head");
+        head.append(el("span", "pill " + b.kind, b.kind), el("small", "", [b.product, b.article].filter(Boolean).join(" · ") || "조항 정보 없음"));
+        li.append(head);
+        li.append(b.kind === "변경" ? diffNode(b.diff) : el("span", "diff", "").appendChild(el(b.kind === "삭제" ? "del" : "ins", "", b.before || b.after)).parentNode);
+        bl.appendChild(li);
+      }
+      det.appendChild(bl);
+      if (r.body_total > r.body.length) det.appendChild(el("p", "cmp-note", `화면에는 앞 ${r.body.length}곳만 보입니다. 엑셀에 모두 있습니다.`));
+      view.appendChild(det);
+    }
+  }
+  $("c-dl").addEventListener("click", () => {
+    const t = TOOLS.compare;
+    if (t.cmp && t.cmp.xlsx) saveFile(t, t.cmp.xlsx, t.cmp.name);
+  });
+
+  // ---------- 내려받기 ----------
+  async function saveFile(t, blob, filename) {
+    if (window.claude && window.claude.use) {
+      const dl = await window.claude.use("downloads").catch(() => null);
+      if (dl) {
+        try {
+          await dl.save({ filename, data: blob });
+          showMsg(t, "엑셀을 저장했습니다: " + filename);
+        } catch (e) {
+          if (e && e.code === "declined") showMsg(t, "저장을 취소했습니다.", "warn");
+          else showMsg(t, "이 화면에서는 파일을 저장할 수 없습니다 (" + ((e && e.code) || "unavailable") + ").", "err");
+        }
+        return;
+      }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  // ---------- 시작: 예제 결과를 먼저 보여 주고 실행 엔진을 미리 준비 ----------
+  for (const t of Object.values(TOOLS)) {
+    if (!t.view) buildView(t);
+    try {
+      const sample = JSON.parse($("sample-" + t.key).textContent);
+      for (const l of sample.log) logLine(t, l, "dim");
+      logLine(t, t.sampleNote, "dim");
+      if (t.view === "info") setInfo(t, sample.data, true);
+      else if (t.view === "compare") setCompare(t, sample.data, null, "", true);
+      else setResult(t, { name: sample.name, sheets: sample.sheets, xlsx: null, sample: true });
+    } catch (e) {}
+  }
+  route();
+  refreshButtons();
+  startWorker();
+
+  // 회사 로고: 페이지와 같은 폴더에 logo.png 가 있으면 상단바와 처음 화면의 마크 대신 표시 (없으면 기본 마크)
+  const img = new Image();
+  img.alt = "";
+  img.onload = () => {
+    $("logo-slot").appendChild(img);
+    const big = img.cloneNode();
+    $("home-logo").appendChild(big);
+    document.body.classList.add("has-logo");
+  };
+  img.src = "logo.png";
+})();
+</script>

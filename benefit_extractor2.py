@@ -3,7 +3,7 @@
 약관 지급기준표 추출 프로그램 (통계테이블 초안 만들기)
 ----------------------------------------------------------------
 - Word 약관(.docx)에서 '급부명 / 지급사유 / 지급금액' 표를 찾아
-  급부명, 산출기준, 지급율, 적립금 지급여부, 면책기간, 경과년1/경과년2 를 뽑습니다.
+  급부명, 산출기준, 지급율, 지급주기, 적립금 지급여부, 면책기간, 경과년1/경과년2 를 뽑습니다.
 - 감액(예: 1년미만 50%)이 있으면 경과 구간을 자동으로 나눕니다.
     예) 0~12 : 0.5 / 13~999 : 1
 - 한 파일에 여러 특약이 들어 있는 책자형 약관(PDF)도 특약 제목을 찾아 특약별로 구분합니다.
@@ -14,6 +14,7 @@
     [처리결과]    파일별 성공/실패
 - 일반 .docx 는 직접 읽고, 문서보안(DRM) 파일이나 .doc 파일은
   PC의 Word를 화면에 안 보이게 열어서 읽습니다. (추가 설치 필요 없음)
+- 문서보안(DRM)으로 암호화된 PDF 는 PC의 Word로 열어서 읽고, 암호화된 급부코드표(엑셀/CSV)는 PC의 Excel로 열어 값만 읽습니다.
 - PDF 도 읽을 수 있습니다 (공개 약관 테스트용). PDF 는 pdfplumber 가 필요합니다.
     Anaconda Prompt 에서: pip install pdfplumber
 - Spyder에서 F5로 실행하면 창이 뜹니다.
@@ -39,17 +40,36 @@ HEADER_BENEFIT = ["급부명", "급부명칭", "보험금종류", "급부"]     
 HEADER_REASON = ["지급사유"]                                      # 지급사유 칸 이름 후보
 HEADER_AMOUNT = ["지급금액", "지급액"]                             # 지급금액 칸 이름 후보
 
-# 산출기준: 지급금액 문구에 들어 있는 단어 → 코드 (위에서부터 먼저 판정)
-#   코드를 모르는 것은 "확인" 으로 두면 '확인필요'로 표시됩니다.
+# 산출기준 코드표 (회사 산출기준)
+CALC_BASIS_CODES = {
+    "01": "보험가입금액 기준",
+    "02": "보험료 (거치형 일시납, 기본보험료) 기준",
+    "03": "기납입보험료",
+    "10": "MAX(보험가입금액, 기납입보험료 합계) * 추가설계 사망보험금 비율",
+    "95": "1구좌(보험료 천만원기준)",
+    "96": "1구좌(보험료 1억원기준)",
+    "97": "1구좌(보험료 5천만원 기준)",
+    "98": "1구좌 (보험료 백만원기준)",
+}
+
+# 산출기준 판정: 지급금액 문구(공백 제거)에서 위에서부터 먼저 맞는 규칙의 코드
+#   (정규식, 코드). 코드를 모르는 것은 "확인" → '확인필요'로 표시
+#   "구좌" 는 1구좌 보험료(천만원/1억원/5천만원/백만원)를 찾아 95~98 로 정함 (UNIT_PREMIUM_CODES)
 CALC_BASIS_RULES = [
-    ("월납", "02"),              # 월납보험료, [월납]
-    ("연납", "02"),              # 연납보험료, [연납]
-    ("기납입보험료", "03"),
-    ("납입보험료", "03"),        # 총 납입보험료
-    ("계약자적립액", "확인"),
-    ("보험가입금액", "01"),
-    ("가입금액", "01"),
+    (r"(?i)max\(", "10"),                                          # MAX(보험가입금액, 기납입보험료)
+    (r"가입금액.{0,20}기납입보험료.{0,20}(?:중|큰|많은|최대)", "10"),  # 가입금액과 기납입보험료 중 큰 금액
+    (r"기납입보험료.{0,20}가입금액.{0,20}(?:중|큰|많은|최대)", "10"),
+    (r"추가설계", "10"),                                            # 추가설계 사망보험금 비율
+    (r"구좌", "구좌"),                                              # 1구좌당 …
+    (r"기납입보험료|이미납입한보험료|납입한보험료|총납입보험료", "03"),
+    (r"월납|연납|3월납|6월납|일시납|기본보험료|거치", "02"),          # [월납] 월납보험료, 일시납보험료, 기본보험료
+    (r"납입보험료", "03"),
+    (r"계약자적립액", "확인"),
+    (r"보험가입금액|가입금액", "01"),
+    (r"보험료(?!.{0,6}면제)", "02"),                                # 그 밖의 '보험료' (납입면제 문구는 제외)
 ]
+# 1구좌 보험료(원) → 산출기준 코드
+UNIT_PREMIUM_CODES = {10 ** 7: "95", 10 ** 8: "96", 5 * 10 ** 7: "97", 10 ** 6: "98"}
 
 # 지급금액이 '5,000만원'처럼 금액으로 적힌 표: 표 위 "[기준: 보험가입금액 5,000만원]"으로 나눠 지급율 계산
 #   예) 기준 5,000만원 → 지급금액 5,000만원 = 1, 500만원 = 0.1
@@ -73,8 +93,19 @@ DEATH_WORDS = ["사망"]                                                        
 ONE_TIME_PATTERNS = [r"경과\s*시점", r"종료\s*시점", r"계약\s*해당일에\s*살아\s*있", r"만기\s*(?:시|일)",
                      r"일시\s*(?:금|자금|지급)"]
 
-# 지급금액에 납입주기가 적혀 있으면 '납입주기' 칸에 표시 (월납/연납 행 구분용)
+# 지급금액에 납입주기가 적혀 있으면 [급부원문] 시트 '납입주기' 칸에 표시 (월납/연납 행 구분 참고용)
 PAY_CYCLE_WORDS = ["월납", "3월납", "6월납", "연납", "일시납"]
+
+# 지급주기 (통계테이블 PAY_TERM1)
+#   급부 발생 때마다 한 번 지급 → "100",  정해진 횟수만큼 매월 지급(예: n회 월지급) → "211",  그 밖 → "100"
+PAY_TERM_DEFAULT = "100"
+PAY_TERM_MONTHLY_N = "211"
+PAY_TERM_MONTHLY_N_PATTERNS = [            # 지급사유+지급금액(공백 제거)에서 찾음. '매월' 같은 월 지급 표현 + 횟수/기간이 함께 있어야 함
+    r"매월.{0,30}?\d+회",                   # 매월 계약해당일에 … (120회 한도) / 매월 10만원씩 36회
+    r"\d+회.{0,10}?(?:월지급|매월|월분할|매달)",   # 36회 월지급 / 60회에 걸쳐 매월
+    r"\d+개월(?:간|동안).{0,20}?(?:매월|매달|월지급)",   # 36개월간 매월
+    r"(?:매월|매달).{0,30}?\d+개월(?:간|동안)",         # 매월 … 36개월간
+]
 
 # 경과 구간 (월 단위)
 END_MONTH = 999
@@ -92,7 +123,34 @@ PRODUCT_TITLE_EXCLUDE = ["이 특약", "이특약", "합니다", "됩니다", "�
 # 급부코드 매핑 엑셀(선택): 첫 번째 열 = 급부코드, 두 번째 열 = 급부코드명
 # 급부명 비교 시 끝에서 떼어낼 표현 (예: 치료비 ↔ 치료)
 NAME_SUFFIXES = ["보험금", "급여금", "지원금", "자금", "비", "금"]
-MATCH_WARN_SCORE = 0.75     # 이 점수 미만이면 '확인필요'
+
+# 급부코드표: 칼럼명으로 찾음 (모든 시트, 위에서 15행 안에서 칼럼명 행을 찾음)
+CODE_ID_COLS = ["CD_ID", "급부코드", "SCRP_RISK_PRM_CODE"]
+CODE_NM_COLS = ["CD_NM", "급부코드명", "급부명"]
+
+# 급부 매칭
+#   1) 급부명 전체가 급부코드명과 거의 같으면(NAME_DIRECT_SCORE 이상) 그 코드 하나
+#   2) 아니면 지급사유에 나온 질병명(약관의 "‘OO’이라 함은" 정의 + 급부코드명에 있는 질병명)마다
+#      '질병명 + 행위(진단/수술…)' 로 급부코드를 찾음 → 질병명이 여러 개면 급부코드도 여러 개(행도 여러 개)
+#   3) 그래도 없으면 급부명과 가장 비슷한 코드 (확인필요)
+NAME_DIRECT_SCORE = 0.88
+MATCH_OK_SCORE = 0.85        # 이 점수 이상이면 정상, 미만이면 '확인필요'
+MATCH_MIN_SCORE = 0.60       # 이 점수 미만이면 코드를 넣지 않음
+# 약관 용어 → 급부코드표 용어 (예: 약관의 '암' = 급부코드표의 '일반암')
+TERM_ALIAS = {"암": "일반암"}
+# 비교할 때 무시할 말 (예: 약관 '3대주요암' = 급부코드표 '3대암')
+TERM_IGNORE_WORDS = ["주요"]
+# 급부코드명 괄호 안의 말
+#   - 질병명 목록 (예: 3대암(위암,폐암,간암)진단): 지급사유에 나오면 그 코드에 가산점
+#   - 그 밖의 구분어 (예: 암진단(간병비)): 급부명·지급사유에 없으면 그 코드에 감점 → 일반 '암진단비'가 간병비 코드로 가지 않게
+PAREN_MISS_PENALTY = 0.35
+PAREN_DISEASE_BONUS = 0.1      # 질병명 하나당 (최대 PAREN_DISEASE_BONUS_MAX)
+PAREN_DISEASE_BONUS_MAX = 0.2
+# 급부의 '행위' (급부명에서 먼저 찾고, 없으면 지급사유에서 찾음)
+ACTION_WORDS = ["진단", "수술", "입원", "통원", "치료", "사망", "장해", "항암", "방사선", "약물", "검사",
+                "간병", "요양", "골절", "화상", "생존", "중도", "만기"]
+# 질병명으로 볼 용어의 끝 글자 (약관 정의에서 '청약일로부터…' 같은 일반 용어를 거르기 위함)
+DISEASE_ENDINGS = ["암", "종양", "증", "혈", "질환", "질병", "병", "치매", "경색", "출혈", "골절", "화상", "장해", "결석"]
 
 # =====================================================================
 # Word(.docx) 읽기 - 추가 설치 없이 zip/XML 로 직접 읽음
@@ -497,7 +555,10 @@ def _pdf_page_tables(page, carry):
     return found, nxt
 
 
-def read_pdf(path):
+PDF_PROGRESS_PAGES = 100   # PDF 를 읽을 때 이 쪽수마다 진행 상황을 로그에 표시
+
+
+def read_pdf(path, log=None):
     try:
         import pdfplumber
     except ImportError:
@@ -505,7 +566,8 @@ def read_pdf(path):
     blocks = []
     carry = None
     with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
+        n_pages = len(pdf.pages)
+        for pno, page in enumerate(pdf.pages, 1):
             tables, carry = _pdf_page_tables(page, carry)
             boxes = [(t[4][0] - 2, t[0], t[4][-1] + 2, t[1]) for t in tables]
             items = [(t[0], "tbl", t[2]) for t in tables if t[2]]
@@ -528,16 +590,45 @@ def read_pdf(path):
                         y += 0.001
             items.sort(key=lambda x: x[0])
             blocks += [(k, d) for _, k, d in items]
+            page.close()        # 읽은 쪽의 글자·선 정보를 메모리에서 비움 (큰 PDF에서 메모리 부족 방지)
+            if log and n_pages > PDF_PROGRESS_PAGES and (pno % PDF_PROGRESS_PAGES == 0 or pno == n_pages):
+                log(f"  {os.path.basename(path)}: {pno}/{n_pages}쪽 읽음")
     text = " ".join(d for k, d in blocks if k == "p")
     if text.count("(cid:") > 20:
         raise RuntimeError("PDF 글자를 읽을 수 없음(글꼴 문제). Word 파일로 시도해 주세요.")
     return blocks
 
 
-def read_any(path, word_reader):
-    """일반 .docx 는 바로 읽고, 안 되면(DRM/.doc) Word 프로그램으로 읽음. (blocks, 읽은방식)"""
+def starts_with(path, magic):
+    """파일 앞부분이 magic 으로 시작하면 True (문서보안(DRM)으로 암호화된 파일은 앞부분이 달라짐)"""
+    try:
+        with open(path, "rb") as f:
+            return f.read(len(magic)) == magic
+    except OSError:
+        return False
+
+
+def read_any(path, word_reader, log=None):
+    """일반 .docx/.pdf 는 바로 읽고, 안 되면(DRM/.doc/읽을 수 없는 PDF) Word 프로그램으로 읽음. (blocks, 읽은방식)"""
     if path.lower().endswith(".pdf"):
-        return read_pdf(path), "PDF"
+        pdf_err = "문서보안(DRM) 암호화 의심"
+        if starts_with(path, b"%PDF"):
+            try:
+                return read_pdf(path, log), "PDF"
+            except RuntimeError as e:
+                if "pdfplumber" in str(e):
+                    raise                       # pdfplumber 미설치 안내는 그대로
+                pdf_err = str(e)
+            except Exception as e:
+                pdf_err = f"PDF 읽기 실패: {e}"
+        if log:
+            log(f"  {os.path.basename(path)}: PDF를 직접 읽지 못해({pdf_err}) Word로 열어 읽습니다.")
+        try:
+            return word_reader.read(path), "Word"
+        except ImportError:
+            raise RuntimeError(f"PDF를 읽지 못함({pdf_err}). win32com 이 없어 Word로도 읽지 못함")
+        except Exception as e:
+            raise RuntimeError(f"PDF를 읽지 못함({pdf_err}). Word로 열기도 실패: {e}")
     if path.lower().endswith((".docx", ".docm")):
         try:
             return read_docx(path), "직접"
@@ -610,32 +701,66 @@ def find_base_amount(texts):
     return None, ""
 
 
-def get_basis(amount_text):
+def find_unit_premium(texts):
+    """'1구좌(보험료 1,000만원 기준)', '[기준: 1구좌 = 보험료 1억원]' → (1구좌 보험료(원), 근거). 못 찾으면 (None, '')"""
+    for t in texts:
+        s = nospace(t).replace(",", "")
+        if "구좌" not in s:
+            continue
+        s = re.sub(r"(?<![\d.])(억|천만|백만|십만)원", r"1\1원", s)      # '천만원' → '1천만원'
+        m = re.search(r"구좌.{0,15}?보험료(.{0,20})", s)
+        money = find_money(m.group(1)) if m else []
+        if money:
+            return money[0], clean(t)
+    return None, ""
+
+
+def _unit_basis(unit_premium):
+    code = UNIT_PREMIUM_CODES.get(unit_premium)
+    if code:
+        return code, f"1구좌(보험료 {int(unit_premium):,}원)"
+    if unit_premium:
+        return "확인", f"1구좌 보험료 {int(unit_premium):,}원은 산출기준표에 없음"
+    return "확인", "1구좌 보험료를 못 찾음"
+
+
+def get_basis(amount_text, unit_premium=None):
+    """지급금액 → (산출기준 코드, 근거 문구). unit_premium: 지급사유·지급금액에 '구좌'가 있을 때 찾은 1구좌 보험료"""
     t = nospace(amount_text)
-    for word, code in CALC_BASIS_RULES:
-        if word in t:
-            return code, word
+    for pat, code in CALC_BASIS_RULES:
+        m = re.search(pat, t)
+        if m:
+            return _unit_basis(unit_premium) if code == "구좌" else (code, m.group(0))
+    if unit_premium:                         # 지급사유에만 '1구좌'가 있고 지급금액은 금액만 적힌 경우
+        return _unit_basis(unit_premium)
     if find_money(amount_text):              # '5,000만원' 처럼 금액만 적힌 경우
         return MONEY_BASIS_CODE, "금액"
     return "확인", ""
 
 
+# 감액 문구: '1년미만 … 50%'  (get_reduction 과 get_rate 가 함께 씀)
+REDUCTION_RE = r"(\d+)\s*년\s*(?:미만|이내)([^%]{0,60}?)(\d+(?:\.\d+)?)\s*%"
+
+
 def get_rate(amount_text, base=None):
-    """지급금액 → (지급율, 확인필요메모)"""
+    """지급금액 → (지급율, 확인필요메모)
+    감액 문구의 %는 기본 지급율이 아니므로 빼고 봄
+      예) '보험가입금액 (다만, 1년미만 진단확정시 보험가입금액의 50% 지급)' → 1 (감액 50%는 경과 구간에서 따로 적용)"""
+    amount_text = re.sub(REDUCTION_RE, " ", amount_text)
     pcts = re.findall(r"(\d+(?:\.\d+)?)\s*%", amount_text)
     if len(pcts) == 1:
         return round(float(pcts[0]) / 100, 4), ""
     if len(pcts) > 1:
         return round(float(pcts[0]) / 100, 4), f"지급금액에 %가 여러 개({', '.join(pcts)}%)"
     money = find_money(amount_text)
-    if money:                                # 금액 ÷ 기준 보험가입금액
+    if money:                                # 금액 ÷ 기준금액 (보험가입금액 또는 1구좌 보험료)
         if not base:
             return None, "지급금액이 금액인데 [기준: 보험가입금액] 을 못 찾음"
         memo = f"지급금액에 금액이 여러 개({len(money)}개)" if len(money) > 1 else ""
         return round(money[0] / base, 4), memo
     t = nospace(amount_text)
     # "보험가입금액", "총 납입보험료", "월납보험료" 처럼 기준만 적혀 있으면 100% 로 봄
-    if any(w in t for w, _ in CALC_BASIS_RULES) and not re.search(r"\d", t):
+    if any(re.search(p, t) for p, _ in CALC_BASIS_RULES) and not re.search(r"\d", t):
         return 1.0, ""
     return None, "지급금액에 % / 금액이 없음"
 
@@ -644,7 +769,7 @@ def get_reduction(text):
     """감액 문구 → (년수, 비율, 방식, 원문)
     '1년미만 ... 치료비의 50%'       → 기본지급율 × 0.5 (비율)
     '1년미만 ... 보험가입금액의 50%' → 0.5 그대로 (절대값)"""
-    m = re.search(r"(\d+)\s*년\s*(?:미만|이내)([^%]{0,60}?)(\d+(?:\.\d+)?)\s*%", text)
+    m = re.search(REDUCTION_RE, text)
     if not m:
         return None, None, "", ""
     mode = "절대값" if "가입금액" in nospace(m.group(2)) else "비율"
@@ -713,8 +838,26 @@ def get_pay_cycle(amount_text):
     return found[0] if found else ""
 
 
+def get_pay_term(text):
+    """지급사유+지급금액 → (지급주기 코드, 근거). n회 월지급이면 '211', 그 밖은 '100'"""
+    t = nospace(text)
+    for p in PAY_TERM_MONTHLY_N_PATTERNS:
+        m = re.search(p, t)
+        if m:
+            return PAY_TERM_MONTHLY_N, m.group(0)
+    return PAY_TERM_DEFAULT, ""
+
+
+def strip_ignore_words(s):
+    for w in TERM_IGNORE_WORDS:
+        s = s.replace(w, "")
+    return s
+
+
 def norm_benefit(s):
-    s = nospace(re.sub(r"[\(\[].*?[\)\]]", "", s))
+    """급부명 비교용: 괄호·공백·로마숫자·무시할 말('주요')·끝의 '자금/비/금' 등 제거"""
+    s = strip_ignore_words(nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", s or "")))
+    s = re.sub(r"(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ|Ⅴ|II|III|IV)+$", "", s)
     for suf in NAME_SUFFIXES:
         if s.endswith(suf) and len(s) > len(suf) + 1:
             s = s[: -len(suf)]
@@ -722,23 +865,293 @@ def norm_benefit(s):
     return s
 
 
-def load_code_table(path):
+def paren_parts(code_name):
+    """급부코드명 괄호 안 → (구분어 목록, 질병명 목록). 예) '암진단(간병비)' → (['간병'], []),
+    '3대암(위암,폐암,간암)진단' → ([], ['위암', '폐암', '간암'])"""
+    quals, diseases = [], []
+    for inner in re.findall(r"[\(\[【]([^\)\]】]*)[\)\]】]", code_name or ""):
+        for tok in re.split(r"[,·/ㆍ\s]+", inner):
+            tok = strip_ignore_words(nospace(tok))
+            if not tok:
+                continue
+            if any(tok.endswith(e) for e in DISEASE_ENDINGS):
+                diseases.append(tok)
+            else:
+                for suf in NAME_SUFFIXES:                    # 간병비 → 간병
+                    if tok.endswith(suf) and len(tok) > len(suf) + 1:
+                        tok = tok[: -len(suf)]
+                        break
+                quals.append(tok)
+    return quals, diseases
+
+
+def paren_adjust(row, name, reason):
+    """급부코드명 괄호 안의 말로 점수 조정 (구분어가 없으면 감점, 질병명이 지급사유에 있으면 가산)"""
+    quals, diseases = row["_p"]
+    if not quals and not diseases:
+        return 0.0
+    text = strip_ignore_words(nospace(f"{name} {reason}"))
+    adj = -PAREN_MISS_PENALTY * sum(1 for q in quals if q not in text)
+    hits = sum(1 for d in diseases if d in text)
+    return adj + min(PAREN_DISEASE_BONUS_MAX, PAREN_DISEASE_BONUS * hits)
+
+
+def actions_in(text):
+    t = nospace(text)
+    return [a for a in ACTION_WORDS if a in t]
+
+
+def disease_part(name_n):
+    """급부코드명(정리된 것)에서 행위어를 뺀 질병 부분. 예) 기타피부암진단 → 기타피부암"""
+    d = name_n
+    for a in sorted(ACTION_WORDS, key=len, reverse=True):
+        d = d.replace(a, "")
+    return d
+
+
+def _find_col_name(header, cands):
+    hs = [nospace(str(h)).upper() if h is not None else "" for h in header]
+    for c in cands:
+        if c.upper() in hs:
+            return hs.index(c.upper())
+    return None
+
+
+def _excel_cell_str(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)                 # Excel 숫자 101.0 → '101'
+    return str(v)
+
+
+def read_excel_with_app(path):
+    """문서보안(DRM)·구버전 엑셀/CSV: PC의 Excel을 화면에 안 보이게 열어 시트별 값만 읽음 → {시트명: DataFrame(글자)}"""
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError:
+        raise RuntimeError("급부코드표가 일반 형식이 아니고(문서보안/구버전 의심), win32com 이 없어 Excel로도 읽지 못함")
+    pythoncom.CoInitialize()          # 실행 버튼 작업(별도 스레드)에서 Excel을 쓰려면 필요
+    app = None
+    try:
+        app = win32com.client.DispatchEx("Excel.Application")
+        app.Visible = False
+        app.DisplayAlerts = False
+        xb = app.Workbooks.Open(os.path.abspath(path), UpdateLinks=0, ReadOnly=True)
+        try:
+            sheets = {}
+            for xs in xb.Worksheets:
+                vals = xs.UsedRange.Value2
+                if vals is None:
+                    continue
+                if not isinstance(vals, tuple):
+                    vals = ((vals,),)
+                sheets[str(xs.Name)] = pd.DataFrame([[_excel_cell_str(v) for v in row] for row in vals], dtype=object)
+            return sheets
+        finally:
+            xb.Close(False)
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"급부코드표를 Excel로 열기 실패: {e}")
+    finally:
+        if app is not None:
+            try:
+                app.Quit()
+            except Exception:
+                pass
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+def _is_plain_code_table(path):
+    """파이썬이 바로 읽을 수 있는 급부코드표인지 (아니면 문서보안/구버전 → Excel로 읽음)"""
+    low = path.lower()
+    if low.endswith((".xlsx", ".xlsm")):
+        return starts_with(path, b"PK")
+    if low.endswith(".csv"):
+        try:
+            with open(path, "rb") as f:
+                return b"\x00" not in f.read(4096)     # 암호화된 글자 파일에는 이상한 바이트가 섞임
+        except OSError:
+            return False
+    return False                                       # .xls 등은 Excel로 읽음
+
+
+def load_code_table(path, log=None):
+    """급부코드표 읽기: 'CD_ID'(급부코드) / 'CD_NM'(급부명) 칼럼을 이름으로 찾음
+    문서보안(DRM)·구버전(.xls) 파일은 PC의 Excel로 열어서 값만 읽음"""
     if not path:
         return None
-    df = pd.read_excel(path, dtype=str).iloc[:, :2]
-    df.columns = ["급부코드", "급부코드명"]
-    df = df.dropna(subset=["급부코드명"])
-    df["_n"] = df["급부코드명"].map(norm_benefit)
-    return df
+    sheets = None
+    if _is_plain_code_table(path):
+        try:
+            if path.lower().endswith(".csv"):
+                try:
+                    sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="utf-8-sig")}
+                except UnicodeDecodeError:
+                    sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="cp949")}
+            else:
+                sheets = pd.read_excel(path, header=None, dtype=str, sheet_name=None)
+        except (zipfile.BadZipFile, ValueError):
+            sheets = None
+    if sheets is None:
+        if log:
+            log(f"  급부코드표 {os.path.basename(path)}: 일반 형식이 아니어서(문서보안/구버전 의심) Excel로 열어 읽습니다.")
+        sheets = read_excel_with_app(path)
+    for sname, raw in sheets.items():
+        for hr in range(min(15, len(raw))):
+            header = list(raw.iloc[hr])
+            ci, ni = _find_col_name(header, CODE_ID_COLS), _find_col_name(header, CODE_NM_COLS)
+            if ci is None or ni is None:
+                continue
+            df = raw.iloc[hr + 1:, [ci, ni]].copy()
+            df.columns = ["급부코드", "급부코드명"]
+            df["급부코드"] = df["급부코드"].fillna("").map(lambda v: str(v).strip())
+            df["급부코드명"] = df["급부코드명"].fillna("").map(lambda v: clean(str(v)))
+            df = df[(df["급부코드"] != "") & (df["급부코드명"] != "")].drop_duplicates("급부코드")
+            df["_n"] = df["급부코드명"].map(norm_benefit)
+            df["_d"] = df["_n"].map(disease_part)
+            df["_a"] = df["급부코드명"].map(actions_in)
+            df["_p"] = df["급부코드명"].map(paren_parts)
+            return df.reset_index(drop=True)
+    raise RuntimeError(f"급부코드표에서 칼럼명 {CODE_ID_COLS[0]} / {CODE_NM_COLS[0]} 을(를) 찾지 못했습니다.")
 
 
-def match_code(name, codes):
-    if codes is None or codes.empty:
-        return "", "", None
+def defined_terms(whole):
+    """약관 전체에서 "‘OO’이라 함은" 으로 정의된 질병 용어 모으기"""
+    terms = set()
+    for m in re.finditer(r"[‘'“\"「]([^’'”\"」]{1,20})[’'”\"」]\s*(?:이라|라)\s*함은", whole):
+        t = clean(m.group(1))
+        if any(nospace(t).endswith(e) for e in DISEASE_ENDINGS) and not re.search(r"\d|기간|동안|나이", t):
+            terms.add(t)
+    return terms
+
+
+def known_terms(whole, codes):
+    """지급사유에서 찾을 질병 용어 = 약관 정의 용어 + 급부코드명의 질병 부분"""
+    terms = {strip_ignore_words(nospace(t)) for t in defined_terms(whole)}
+    if codes is not None:
+        terms |= {d for d in codes["_d"] if len(d) >= 2 and any(d.endswith(e) for e in DISEASE_ENDINGS)}
+    terms |= set(TERM_ALIAS)
+    return sorted(terms, key=len, reverse=True)
+
+
+def terms_in_reason(reason, terms):
+    """지급사유에 나온 질병 용어(긴 것 우선, 겹치지 않게). '(…제외)' 안과 'OO보장개시일' 은 제외"""
+    t = strip_ignore_words(re.sub(r"\([^()]*제외[^()]*\)", " ", reason))
+    t = re.sub(r"\S*보장\s*개시일", " ", t)
+    quoted = {nospace(q) for q in re.findall(r"[‘'“\"「]([^’'”\"」]{1,20})[’'”\"」]", t)
+              if any(nospace(q).endswith(e) for e in DISEASE_ENDINGS)}
+    terms = sorted(set(terms) | quoted, key=len, reverse=True)
+    used, found = [False] * len(t), []
+    for term in terms:
+        pat = r"\s*".join(map(re.escape, term))
+        for m in re.finditer(pat, t):
+            s0, e0 = m.span()
+            if any(used[s0:e0]):
+                continue
+            if len(term) <= 2 and s0 > 0 and re.match(r"[가-힣]", t[s0 - 1]):   # '암'은 단어 시작일 때만
+                continue
+            for k in range(s0, e0):
+                used[k] = True
+            found.append((s0, term))
+    found.sort()
+    out = []
+    for _, term in found:
+        if term not in out:
+            out.append(term)
+    return out
+
+
+def _score(term, acts, row):
+    """질병 용어 + 행위어 ↔ 급부코드명 점수 (0~1)"""
+    t = TERM_ALIAS.get(term, term)
+    d = row["_d"]
+    if not d:
+        s = 0.0
+    elif t == d:
+        s = 0.6
+    elif d in t or t in d:
+        s = 0.35 + 0.2 * min(len(d), len(t)) / max(len(d), len(t))
+    else:
+        s = 0.45 * difflib.SequenceMatcher(None, t, d).ratio()
+    ca = row["_a"]
+    if acts:
+        hit = len([a for a in acts if a in ca]) / len(acts)
+        s += 0.4 * hit if hit else (-0.1 if ca else 0.1)
+    else:
+        s += 0.2 if not ca else 0.1
+    return s
+
+
+def names_without_codes(name, reason, terms):
+    """급부체계(급부코드표)가 없을 때: 약관 기준 급부명 만들기 → [("", 약관급부명, None, 근거)]
+    - 지급사유에 질병명이 2개 이상 → 질병명마다 '질병명 + 행위' (예: 기타피부암 진단, 제자리암 진단)
+    - 질병명이 1개이고 급부명에 들어 있거나, 질병명이 없으면 → 급부명 그대로 (예: 고액암진단)
+    - 질병명이 1개인데 급부명에 없으면 → '질병명 + 행위' (예: 암진단비 → 일반암 진단)"""
     n = norm_benefit(name)
-    scores = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio())
-    i = scores.idxmax()
-    return codes.at[i, "급부코드"], codes.at[i, "급부코드명"], round(float(scores[i]), 2)
+    acts = actions_in(name) or actions_in(reason)
+    act = acts[0] if acts else ""
+    found = terms_in_reason(reason, terms)
+
+    def label(term):
+        t = TERM_ALIAS.get(term, term)
+        return f"{t} {act}".strip()
+
+    if len(found) >= 2:
+        return [("", label(t), None, f"지급사유 질병명: {t}") for t in found]
+    if len(found) == 1 and (found[0] not in n or found[0] in TERM_ALIAS):
+        return [("", label(found[0]), None, f"지급사유 질병명: {found[0]}")]
+    return [("", display_name(name), None, "약관 급부명")]
+
+
+def display_name(name):
+    """표시용 급부명: 괄호·공백 제거, 끝의 '자금/비/금'은 앞이 행위어(진단·수술…)일 때만 뗌
+    예) 고액암진단자금 → 고액암진단, 건강관리자금 → 건강관리자금"""
+    s = nospace(re.sub(r"[\(\[【].*?[\)\]】]", "", name or ""))
+    for suf in NAME_SUFFIXES:
+        if s.endswith(suf) and any(s[: -len(suf)].endswith(a) for a in ACTION_WORDS):
+            return s[: -len(suf)]
+    return s
+
+
+def match_codes(name, reason, codes, terms):
+    """급부 1개 → [(급부코드, 급부코드명, 점수, 근거)] (여러 개일 수 있음)"""
+    if codes is None or codes.empty:
+        return names_without_codes(name, reason, terms)
+    n = norm_benefit(name)
+    adj = codes.apply(lambda r: paren_adjust(r, name, reason), axis=1)       # 괄호 안 구분어·질병명
+    score = lambda s: round(min(1.0, float(s)), 2)
+    # 1) 급부명 전체가 거의 같은 코드
+    ratios = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio()) + adj
+    i = ratios.idxmax()
+    if ratios[i] >= NAME_DIRECT_SCORE:
+        return [(codes.at[i, "급부코드"], codes.at[i, "급부코드명"], score(ratios[i]), "급부명 일치")]
+    # 2) 지급사유의 질병 용어마다
+    acts = actions_in(name) or actions_in(reason)
+    found = terms_in_reason(reason, terms)
+    out = []
+    for term in found:
+        sc = codes.apply(lambda r: _score(term, acts, r), axis=1) + adj
+        j = sc.idxmax()
+        if sc[j] >= MATCH_MIN_SCORE:
+            out.append((codes.at[j, "급부코드"], codes.at[j, "급부코드명"], score(sc[j]),
+                        f"지급사유 질병명: {term}"))
+        else:
+            out.append(("", "", score(sc[j]), f"지급사유 질병명: {term} (맞는 코드 없음)"))
+    if any(c for c, *_ in out):
+        return out
+    # 3) 급부명과 가장 비슷한 코드
+    d = disease_part(n)
+    sc = codes.apply(lambda r: max(_score(d, acts, r), difflib.SequenceMatcher(None, n, r["_n"]).ratio()), axis=1) + adj
+    j = sc.idxmax()
+    if sc[j] >= MATCH_MIN_SCORE:
+        return [(codes.at[j, "급부코드"], codes.at[j, "급부코드명"], score(sc[j]), "급부명 유사")]
+    return out or [("", "", score(sc[j]), "맞는 코드 없음")]
 
 
 # =====================================================================
@@ -756,7 +1169,8 @@ def product_title(text):
     if any(w in t for w in PRODUCT_TITLE_EXCLUDE):
         return None
     core = re.sub(r"\s*약관$", "", t)
-    if not (any(core.endswith(e) for e in PRODUCT_TITLE_ENDINGS)
+    stem = re.sub(r"\s*(?:Ⅰ|Ⅱ|Ⅲ|Ⅳ|Ⅴ|II|III|IV|V)$", "", core)     # 개정 특약의 끝 로마숫자 (예: OO특약Ⅱ)
+    if not (any(stem.endswith(e) for e in PRODUCT_TITLE_ENDINGS)
             or any(re.search(p, t) for p in PRODUCT_TITLE_PATTERNS)):
         return None
     core = re.sub(r"^\s*(?:[\d]+(?:[\-\.]\d+)*\.?|[①-⑳]|[가-하]\.)\s*", "", core)   # 앞 번호 제거
@@ -783,8 +1197,9 @@ def _only_page_noise(blocks, a, b):
 
 
 def extract_file(path, codes, log, word_reader):
-    blocks, how = read_any(path, word_reader)
+    blocks, how = read_any(path, word_reader, log)
     whole = "\n".join(b[1] for b in blocks if b[0] == "p")
+    terms = known_terms(whole, codes)          # 지급사유에서 찾을 질병 용어 (약관 정의 + 급부코드명)
 
     # 1) 지급기준표 모으기 (다음 쪽으로 이어진 표는 하나로 합침)
     file_product = os.path.splitext(os.path.basename(path))[0]
@@ -810,11 +1225,15 @@ def extract_file(path, codes, log, word_reader):
                 prev_p = [blocks[k][1] for k in range(bi - 1, max(-1, bi - 6), -1) if blocks[k][0] == "p"]
                 title = next((p for p in prev_p if "별표" in p or "지급기준표" in nospace(p)),
                              prev_p[0] if prev_p else "")
-                near = [blocks[k][1] for k in range(bi - 1, max(-1, bi - 6), -1) if blocks[k][0] == "p"]
+                near = []                  # 표 바로 위 문단 (앞 표를 넘어가지 않음: 앞 표의 [기준: …] 을 가져오지 않도록)
+                for k in range(bi - 1, max(-1, bi - 6), -1):
+                    if blocks[k][0] != "p":
+                        break
+                    near.append(blocks[k][1])
                 near += [" ".join(r) for r in data[:hdr_i]]
                 base, base_src = find_base_amount(near)
                 cur = {"title": title, "product": product or file_product,
-                       "base": base, "base_src": base_src,
+                       "base": base, "base_src": base_src, "near": near,
                        "section": (product_idx, bi),
                        "width": width, "start": bi, "end": bi, "rows": [],
                        "c": (find_col(header, HEADER_BENEFIT), find_col(header, HEADER_REASON),
@@ -868,7 +1287,7 @@ def extract_file(path, codes, log, word_reader):
             if base is None and find_money(amount):     # 표 근처에 없으면 특약 본문에서 '기준' 문구 찾기
                 base, base_src = find_base_amount(section.split("\n") + notes.split("\n"))
             benefits.append(parse_benefit(path, g["product"], g["title"], name, reason, amount,
-                                          notes, section, whole, codes, base, base_src))
+                                          notes, section, whole, codes, base, base_src, g["near"], terms))
 
     tag = {"Word": " (Word로 읽음)", "PDF": " (PDF)"}.get(how, "")
     n_prod = len({g["product"] for g in groups})
@@ -877,12 +1296,17 @@ def extract_file(path, codes, log, word_reader):
 
 
 def parse_benefit(path, product, title, raw_name, reason, amount, notes, section, whole, codes,
-                  base=None, base_src=""):
+                  base=None, base_src="", near=(), terms=None):
     name, article = split_name(raw_name)
     both = reason + " " + amount
     memo = []
 
-    basis, basis_word = get_basis(amount)
+    unit, unit_src = None, ""
+    if "구좌" in nospace(both):              # 1구좌 보험료: 지급금액·지급사유 → 표 근처 → 특약 본문 → (주) 순서로 찾음
+        unit, unit_src = find_unit_premium([amount, reason] + list(near) + section.split("\n") + notes.split("\n"))
+    basis, basis_word = get_basis(amount, unit)
+    if basis in UNIT_PREMIUM_CODES.values():
+        base, base_src = unit, unit_src      # 금액으로 적힌 지급금액은 1구좌 보험료로 나눠 지급율 계산
     if basis == "확인":
         memo.append(f"산출기준 코드 확인({basis_word or '문구 없음'})")
     rate, rate_memo = get_rate(amount, base)
@@ -895,33 +1319,44 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
     if wait is None and "문구 없음" in wait_memo:
         wait = 0
         wait_src = "보장개시일 문구 없음 → 0"
+    pay_term, pay_term_src = get_pay_term(both)
     once, once_src = get_once_flag(name, both)
     if once is None:
         memo.append(f"적립금 지급여부 확인({once_src})")
-    code, code_name, score = match_code(name, codes)
-    if score is not None and score < MATCH_WARN_SCORE:
-        memo.append(f"급부코드 매칭 낮음({score})")
+    matches = match_codes(name, reason, codes, terms or [])
+    for c, cn, sc, why in matches:
+        if codes is None:
+            break
+        if not c:
+            memo.append(f"급부코드 못 찾음({why})")
+        elif sc < MATCH_OK_SCORE:
+            memo.append(f"급부코드 매칭 확인({cn}, {sc})")
     if red_years and "갱신" in notes and "감액" in notes:
         memo.append("감액: 갱신계약 미적용 문구 있음(갱신형 확인)")
 
     return {
         "파일명": os.path.basename(path), "특약명": product, "별표명": title,
         "급부명": name, "조항": article,
-        "급부코드": code, "급부코드명": code_name, "매칭점수": score,
+        "급부코드": ", ".join(c for c, *_ in matches if c),
+        "급부코드명": ", ".join(cn for c, cn, *_ in matches if c),
+        "약관급부명": ", ".join(cn for c, cn, *_ in matches if not c and cn),
+        "매칭점수": ", ".join(str(sc) for c, cn, sc, _ in matches if c),
+        "매칭근거": " / ".join(w for *_, w in matches),
+        "_matches": matches,
         "납입주기": get_pay_cycle(amount),
-        "산출기준": basis, "기본지급율": rate, "기준금액(원)": base, "근거_기준금액": base_src,
+        "산출기준": basis, "기본지급율": rate, "지급주기": pay_term, "기준금액(원)": base, "근거_기준금액": base_src,
         "감액기간(년)": red_years, "감액비율": red_ratio, "감액방식": red_mode,
         "면책기간": wait, "적립금지급여부": once,
         "확인필요": " / ".join(memo),
-        "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
+        "근거_산출기준": basis_word, "근거_지급주기": pay_term_src, "근거_감액": red_src, "근거_면책": wait_src, "근거_적립금": once_src,
         "원문_지급사유": reason, "원문_지급금액": amount,
     }
 
 
 def expand_rows(b):
     """급부 1개 → 경과 구간별 행"""
-    base = {k: b[k] for k in ["파일명", "특약명", "급부명", "조항", "납입주기", "급부코드", "급부코드명",
-                              "산출기준", "적립금지급여부", "면책기간"]}
+    base = {k: b[k] for k in ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명",
+                              "산출기준", "지급주기", "적립금지급여부", "면책기간"]}
     rate = b["기본지급율"]
     if rate is not None and b["감액기간(년)"]:
         cut = 12 * b["감액기간(년)"]
@@ -930,12 +1365,16 @@ def expand_rows(b):
     else:
         segs = [(0, END_MONTH, rate)]
     out = []
-    for i, (s, e, r) in enumerate(segs):
-        row = dict(base)
-        row.update({"경과년1": s, "경과년2": e, "지급율": r, "확인필요": b["확인필요"]})
-        if i > 0:
-            row["면책기간"] = 0      # 면책은 첫 경과 구간(예: 0~12)에만. 이후 구간은 이미 면책기간이 지남
-        out.append(row)
+    matches = [m for m in b.get("_matches") or [] if m[0] or m[1]] or [("", "", None, "")]
+    for code, code_name, score, why in matches:      # 급부코드(또는 약관급부명)가 여러 개면 그만큼 행을 만듦
+        for i, (s, e, r) in enumerate(segs):
+            row = dict(base)
+            row.update({"급부코드": code, "급부코드명": code_name if code else "",
+                        "약관급부명": "" if code else code_name, "매칭점수": score, "매칭근거": why,
+                        "경과년1": s, "경과년2": e, "지급율": r, "확인필요": b["확인필요"]})
+            if i > 0:
+                row["면책기간"] = 0      # 면책은 첫 경과 구간(예: 0~12)에만. 이후 구간은 이미 면책기간이 지남
+            out.append(row)
     return out
 
 
@@ -958,7 +1397,7 @@ def list_word_files(src):
 
 
 def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
-    codes = load_code_table(code_xlsx) if code_xlsx else None
+    codes = load_code_table(code_xlsx, log) if code_xlsx else None
     files = list_word_files(src)
     if not files:
         raise RuntimeError("Word/PDF 파일을 찾지 못했습니다.")
@@ -988,14 +1427,20 @@ def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
     finally:
         reader.quit()       # 뒤에서 연 Word 닫기
 
-    draft_cols = ["파일명", "특약명", "급부명", "조항", "납입주기", "급부코드", "급부코드명", "산출기준", "지급율",
-                  "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"]
+    draft_cols = ["파일명", "특약명", "급부명", "조항", "급부코드", "급부코드명", "매칭점수", "매칭근거",
+                  "산출기준", "지급율", "지급주기", "적립금지급여부", "면책기간", "경과년1", "경과년2", "확인필요"]
     draft = pd.DataFrame([r for b in benefits for r in expand_rows(b)], columns=draft_cols)
     if codes is None:
-        draft = draft.drop(columns=["급부코드", "급부코드명"])
+        draft.insert(draft.columns.get_loc("급부코드"), "약관급부명",
+                     [r.get("약관급부명", "") for b in benefits for r in expand_rows(b)])
+        draft = draft.drop(columns=["급부코드", "급부코드명", "매칭점수"])
     for c in ["적립금지급여부", "면책기간", "경과년1", "경과년2"]:   # 1.0 → 1 로 표시
         draft[c] = pd.to_numeric(draft[c], errors="coerce").astype("Int64")
-    raw = pd.DataFrame(benefits)
+    raw = pd.DataFrame(benefits).drop(columns=["_matches"], errors="ignore")
+    if codes is None:
+        raw = raw.drop(columns=["급부코드", "급부코드명", "매칭점수"], errors="ignore")
+    else:
+        raw = raw.drop(columns=["약관급부명"], errors="ignore")
     stat = pd.DataFrame(status)
     if len(raw):
         prod = (raw.assign(_chk=raw["확인필요"] != "")
@@ -1075,7 +1520,7 @@ def run_gui():
                 v_out.set(os.path.dirname(f))
 
     word_t = [("Word/PDF", "*.docx *.doc *.docm *.pdf")]
-    xl_t = [("Excel", "*.xlsx *.xls")]
+    xl_t = [("Excel/CSV", "*.xlsx *.xls *.csv")]
     items = [
         ("약관 폴더/파일", v_src, [("폴더", lambda: pick_dir(v_src)), ("파일", lambda: pick_file(v_src, word_t))]),
         ("급부코드표(선택)", v_code, [("파일", lambda: pick_file(v_code, xl_t))]),
