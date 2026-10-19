@@ -14,6 +14,7 @@
     [처리결과]    파일별 성공/실패
 - 일반 .docx 는 직접 읽고, 문서보안(DRM) 파일이나 .doc 파일은
   PC의 Word를 화면에 안 보이게 열어서 읽습니다. (추가 설치 필요 없음)
+- 문서보안(DRM)으로 암호화된 PDF 는 PC의 Word로 열어서 읽고, 암호화된 급부코드표(엑셀/CSV)는 PC의 Excel로 열어 값만 읽습니다.
 - PDF 도 읽을 수 있습니다 (공개 약관 테스트용). PDF 는 pdfplumber 가 필요합니다.
     Anaconda Prompt 에서: pip install pdfplumber
 - Spyder에서 F5로 실행하면 창이 뜹니다.
@@ -590,10 +591,36 @@ def read_pdf(path, log=None):
     return blocks
 
 
+def starts_with(path, magic):
+    """파일 앞부분이 magic 으로 시작하면 True (문서보안(DRM)으로 암호화된 파일은 앞부분이 달라짐)"""
+    try:
+        with open(path, "rb") as f:
+            return f.read(len(magic)) == magic
+    except OSError:
+        return False
+
+
 def read_any(path, word_reader, log=None):
-    """일반 .docx 는 바로 읽고, 안 되면(DRM/.doc) Word 프로그램으로 읽음. (blocks, 읽은방식)"""
+    """일반 .docx/.pdf 는 바로 읽고, 안 되면(DRM/.doc/읽을 수 없는 PDF) Word 프로그램으로 읽음. (blocks, 읽은방식)"""
     if path.lower().endswith(".pdf"):
-        return read_pdf(path, log), "PDF"
+        pdf_err = "문서보안(DRM) 암호화 의심"
+        if starts_with(path, b"%PDF"):
+            try:
+                return read_pdf(path, log), "PDF"
+            except RuntimeError as e:
+                if "pdfplumber" in str(e):
+                    raise                       # pdfplumber 미설치 안내는 그대로
+                pdf_err = str(e)
+            except Exception as e:
+                pdf_err = f"PDF 읽기 실패: {e}"
+        if log:
+            log(f"  {os.path.basename(path)}: PDF를 직접 읽지 못해({pdf_err}) Word로 열어 읽습니다.")
+        try:
+            return word_reader.read(path), "Word"
+        except ImportError:
+            raise RuntimeError(f"PDF를 읽지 못함({pdf_err}). win32com 이 없어 Word로도 읽지 못함")
+        except Exception as e:
+            raise RuntimeError(f"PDF를 읽지 못함({pdf_err}). Word로 열기도 실패: {e}")
     if path.lower().endswith((".docx", ".docm")):
         try:
             return read_docx(path), "직접"
@@ -845,17 +872,91 @@ def _find_col_name(header, cands):
     return None
 
 
-def load_code_table(path):
-    """급부코드표 읽기: 'CD_ID'(급부코드) / 'CD_NM'(급부명) 칼럼을 이름으로 찾음"""
+def _excel_cell_str(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)                 # Excel 숫자 101.0 → '101'
+    return str(v)
+
+
+def read_excel_with_app(path):
+    """문서보안(DRM)·구버전 엑셀/CSV: PC의 Excel을 화면에 안 보이게 열어 시트별 값만 읽음 → {시트명: DataFrame(글자)}"""
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError:
+        raise RuntimeError("급부코드표가 일반 형식이 아니고(문서보안/구버전 의심), win32com 이 없어 Excel로도 읽지 못함")
+    pythoncom.CoInitialize()          # 실행 버튼 작업(별도 스레드)에서 Excel을 쓰려면 필요
+    app = None
+    try:
+        app = win32com.client.DispatchEx("Excel.Application")
+        app.Visible = False
+        app.DisplayAlerts = False
+        xb = app.Workbooks.Open(os.path.abspath(path), UpdateLinks=0, ReadOnly=True)
+        try:
+            sheets = {}
+            for xs in xb.Worksheets:
+                vals = xs.UsedRange.Value2
+                if vals is None:
+                    continue
+                if not isinstance(vals, tuple):
+                    vals = ((vals,),)
+                sheets[str(xs.Name)] = pd.DataFrame([[_excel_cell_str(v) for v in row] for row in vals], dtype=object)
+            return sheets
+        finally:
+            xb.Close(False)
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"급부코드표를 Excel로 열기 실패: {e}")
+    finally:
+        if app is not None:
+            try:
+                app.Quit()
+            except Exception:
+                pass
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+def _is_plain_code_table(path):
+    """파이썬이 바로 읽을 수 있는 급부코드표인지 (아니면 문서보안/구버전 → Excel로 읽음)"""
+    low = path.lower()
+    if low.endswith((".xlsx", ".xlsm")):
+        return starts_with(path, b"PK")
+    if low.endswith(".csv"):
+        try:
+            with open(path, "rb") as f:
+                return b"\x00" not in f.read(4096)     # 암호화된 글자 파일에는 이상한 바이트가 섞임
+        except OSError:
+            return False
+    return False                                       # .xls 등은 Excel로 읽음
+
+
+def load_code_table(path, log=None):
+    """급부코드표 읽기: 'CD_ID'(급부코드) / 'CD_NM'(급부명) 칼럼을 이름으로 찾음
+    문서보안(DRM)·구버전(.xls) 파일은 PC의 Excel로 열어서 값만 읽음"""
     if not path:
         return None
-    if path.lower().endswith(".csv"):
+    sheets = None
+    if _is_plain_code_table(path):
         try:
-            sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="utf-8-sig")}
-        except UnicodeDecodeError:
-            sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="cp949")}
-    else:
-        sheets = pd.read_excel(path, header=None, dtype=str, sheet_name=None)
+            if path.lower().endswith(".csv"):
+                try:
+                    sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="utf-8-sig")}
+                except UnicodeDecodeError:
+                    sheets = {"csv": pd.read_csv(path, header=None, dtype=str, encoding="cp949")}
+            else:
+                sheets = pd.read_excel(path, header=None, dtype=str, sheet_name=None)
+        except (zipfile.BadZipFile, ValueError):
+            sheets = None
+    if sheets is None:
+        if log:
+            log(f"  급부코드표 {os.path.basename(path)}: 일반 형식이 아니어서(문서보안/구버전 의심) Excel로 열어 읽습니다.")
+        sheets = read_excel_with_app(path)
     for sname, raw in sheets.items():
         for hr in range(min(15, len(raw))):
             header = list(raw.iloc[hr])
@@ -1248,7 +1349,7 @@ def list_word_files(src):
 
 
 def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
-    codes = load_code_table(code_xlsx) if code_xlsx else None
+    codes = load_code_table(code_xlsx, log) if code_xlsx else None
     files = list_word_files(src)
     if not files:
         raise RuntimeError("Word/PDF 파일을 찾지 못했습니다.")
