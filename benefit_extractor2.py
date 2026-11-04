@@ -1132,13 +1132,22 @@ def match_codes(name, reason, codes, terms):
     n = norm_benefit(name)
     adj = codes.apply(lambda r: paren_adjust(r, name, reason), axis=1)       # 괄호 안 구분어·질병명
     score = lambda s: round(min(1.0, float(s)), 2)
+    # 0) 급부명의 질병명이 급부코드명의 질병명과 똑같은 코드 (예: 위암 진단자금 ↔ '위암' 또는 '위암진단')
+    #    코드명에 행위(진단·수술…)가 있으면 급부의 행위와 맞아야 함 (위암 진단자금 → '위암수술' 은 제외)
+    dn = disease_part(n)
+    acts = actions_in(name) or actions_in(reason)
+    if len(dn) >= 2:
+        same = [j for j in codes.index if codes.at[j, "_d"] == dn and adj[j] >= 0
+                and (not codes.at[j, "_a"] or not acts or any(a in acts for a in codes.at[j, "_a"]))]
+        if same:
+            best = max(same, key=lambda j: (any(a in acts for a in codes.at[j, "_a"]), adj[j]))
+            return [(codes.at[best, "급부코드"], codes.at[best, "급부코드명"], 1.0, "급부명 질병명 일치")]
     # 1) 급부명 전체가 거의 같은 코드
     ratios = codes["_n"].map(lambda c: difflib.SequenceMatcher(None, n, c).ratio()) + adj
     i = ratios.idxmax()
     if ratios[i] >= NAME_DIRECT_SCORE:
         return [(codes.at[i, "급부코드"], codes.at[i, "급부코드명"], score(ratios[i]), "급부명 일치")]
     # 2) 지급사유의 질병 용어마다
-    acts = actions_in(name) or actions_in(reason)
     found = terms_in_reason(reason, terms)
     out = []
     for term in found:
