@@ -287,7 +287,7 @@ def compare(path_a, path_b, out_dir=None, log=print):
     log(f"본문 문장: 변경 {bcounts['변경']} / 추가 {bcounts['추가']} / 삭제 {bcounts['삭제']}")
 
     result = {
-        "file_before": os.path.basename(path_a), "file_after": os.path.basename(path_b),
+        "file_before": be.file_label(path_a), "file_after": be.file_label(path_b),
         "counts": counts, "product_counts": pcounts, "body_counts": bcounts,
         "products": prod_rows,
         "benefits": [{k: v for k, v in x.items() if k != "_x"} for x in items],

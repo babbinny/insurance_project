@@ -89,10 +89,10 @@ def summarize(src, log=print):
             try:
                 bens = be.extract_file(f, None, log, reader)
             except Exception as e:
-                log(f"  실패: {os.path.basename(f)} -> {e}")
-                status.append({"파일명": os.path.basename(f), "결과": f"실패: {e}", "급부수": 0})
+                log(f"  실패: {be.file_label(f)} -> {e}")
+                status.append({"파일명": be.file_label(f), "결과": f"실패: {e}", "급부수": 0})
                 continue
-            status.append({"파일명": os.path.basename(f), "결과": "성공" if bens else "지급기준표 못 찾음",
+            status.append({"파일명": be.file_label(f), "결과": "성공" if bens else "지급기준표 못 찾음",
                            "급부수": len(bens)})
             for b in bens:
                 rows.append(OrderedDict([

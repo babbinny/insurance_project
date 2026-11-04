@@ -124,13 +124,14 @@ self.onmessage = async (ev) => {
     py.FS.mkdirTree(inDir);
     py.FS.mkdirTree(outDir);
     for (const f of msg.files) {
+      f.path = f.path.normalize("NFC");      // 맥의 한글 파일명(자모 분리, NFD) → 붙은 글자(NFC)
       const p = inDir + "/" + f.path.replace(/^\/+/, "");
       py.FS.mkdirTree(p.slice(0, p.lastIndexOf("/")));
       py.FS.writeFile(p, new Uint8Array(f.data));
     }
     let codePath = null;
     if (msg.code) {
-      codePath = dir + "/" + msg.code.name;
+      codePath = dir + "/" + msg.code.name.normalize("NFC");
       py.FS.writeFile(codePath, new Uint8Array(msg.code.data));
     }
     // 브라우저 안 임시 경로(/work/job1/...)는 화면에 보이지 않게 뗌

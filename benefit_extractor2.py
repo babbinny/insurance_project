@@ -592,11 +592,17 @@ def read_pdf(path, log=None):
             blocks += [(k, d) for _, k, d in items]
             page.close()        # 읽은 쪽의 글자·선 정보를 메모리에서 비움 (큰 PDF에서 메모리 부족 방지)
             if log and n_pages > PDF_PROGRESS_PAGES and (pno % PDF_PROGRESS_PAGES == 0 or pno == n_pages):
-                log(f"  {os.path.basename(path)}: {pno}/{n_pages}쪽 읽음")
+                log(f"  {file_label(path)}: {pno}/{n_pages}쪽 읽음")
     text = " ".join(d for k, d in blocks if k == "p")
     if text.count("(cid:") > 20:
         raise RuntimeError("PDF 글자를 읽을 수 없음(글꼴 문제). Word 파일로 시도해 주세요.")
     return blocks
+
+
+def file_label(path):
+    """결과·로그에 쓰는 파일 이름. 맥(macOS)은 한글 파일명을 자모로 풀어서(NFD) 넘겨 주므로
+    윈도우 엑셀에서 'ㅇㅑㄱㄱㅘㄴ'처럼 깨져 보임 → 붙은 글자(NFC)로 바꿈"""
+    return unicodedata.normalize("NFC", os.path.basename(path))
 
 
 def starts_with(path, magic):
@@ -622,7 +628,7 @@ def read_any(path, word_reader, log=None):
             except Exception as e:
                 pdf_err = f"PDF 읽기 실패: {e}"
         if log:
-            log(f"  {os.path.basename(path)}: PDF를 직접 읽지 못해({pdf_err}) Word로 열어 읽습니다.")
+            log(f"  {file_label(path)}: PDF를 직접 읽지 못해({pdf_err}) Word로 열어 읽습니다.")
         try:
             return word_reader.read(path), "Word"
         except ImportError:
@@ -1000,7 +1006,7 @@ def load_code_table(path, log=None):
             sheets = None
     if sheets is None:
         if log:
-            log(f"  급부코드표 {os.path.basename(path)}: 일반 형식이 아니어서(문서보안/구버전 의심) Excel로 열어 읽습니다.")
+            log(f"  급부코드표 {file_label(path)}: 일반 형식이 아니어서(문서보안/구버전 의심) Excel로 열어 읽습니다.")
         sheets = read_excel_with_app(path)
     for sname, raw in sheets.items():
         for hr in range(min(15, len(raw))):
@@ -1202,7 +1208,7 @@ def extract_file(path, codes, log, word_reader):
     terms = known_terms(whole, codes)          # 지급사유에서 찾을 질병 용어 (약관 정의 + 급부코드명)
 
     # 1) 지급기준표 모으기 (다음 쪽으로 이어진 표는 하나로 합침)
-    file_product = os.path.splitext(os.path.basename(path))[0]
+    file_product = os.path.splitext(file_label(path))[0]
     groups, cur = [], None
     product, product_idx = "", 0          # 지금까지 나온 마지막 특약 제목
     for bi, (kind, data) in enumerate(blocks):
@@ -1291,7 +1297,7 @@ def extract_file(path, codes, log, word_reader):
 
     tag = {"Word": " (Word로 읽음)", "PDF": " (PDF)"}.get(how, "")
     n_prod = len({g["product"] for g in groups})
-    log(f"  {os.path.basename(path)}: 특약 {n_prod}개, 급부 {len(benefits)}개{tag}")
+    log(f"  {file_label(path)}: 특약 {n_prod}개, 급부 {len(benefits)}개{tag}")
     return benefits
 
 
@@ -1335,7 +1341,7 @@ def parse_benefit(path, product, title, raw_name, reason, amount, notes, section
         memo.append("감액: 갱신계약 미적용 문구 있음(갱신형 확인)")
 
     return {
-        "파일명": os.path.basename(path), "특약명": product, "별표명": title,
+        "파일명": file_label(path), "특약명": product, "별표명": title,
         "급부명": name, "조항": article,
         "급부코드": ", ".join(c for c, *_ in matches if c),
         "급부코드명": ", ".join(cn for c, cn, *_ in matches if c),
@@ -1412,18 +1418,18 @@ def run(src, out_dir, code_xlsx=None, log=print, stop_event=None):
                 stopped = True
                 log(f"중단: {i - 1}/{len(files)}개까지 처리한 결과를 저장합니다.")
                 for rest in files[i - 1:]:
-                    status.append({"파일명": os.path.basename(rest), "결과": "중단(미처리)",
-                                   "급부수": 0, "경로": rest})
+                    status.append({"파일명": file_label(rest), "결과": "중단(미처리)",
+                                   "급부수": 0, "경로": unicodedata.normalize("NFC", rest)})
                 break
             log(f"[{i}/{len(files)}]")
             try:
                 got = extract_file(f, codes, log, reader)
                 benefits += got
-                status.append({"파일명": os.path.basename(f), "결과": "성공" if got else "지급기준표 못 찾음",
-                               "급부수": len(got), "경로": f})
+                status.append({"파일명": file_label(f), "결과": "성공" if got else "지급기준표 못 찾음",
+                               "급부수": len(got), "경로": unicodedata.normalize("NFC", f)})
             except Exception as e:
-                log(f"  실패: {os.path.basename(f)} -> {e}")
-                status.append({"파일명": os.path.basename(f), "결과": f"실패: {e}", "급부수": 0, "경로": f})
+                log(f"  실패: {file_label(f)} -> {e}")
+                status.append({"파일명": file_label(f), "결과": f"실패: {e}", "급부수": 0, "경로": unicodedata.normalize("NFC", f)})
     finally:
         reader.quit()       # 뒤에서 연 Word 닫기
 
