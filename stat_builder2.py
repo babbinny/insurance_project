@@ -15,6 +15,8 @@
       → 2번 시트(기존)에서 (변경전 주보종, 변경전 개별상품) 조합의 행을 모두 찾아
         주보종·개별상품코드만 새 코드로 바꿔 1번 시트에 옮김
     예) 관계 4B+9B, 변경전후 4A→4B, 9A→9B  →  기존의 4A+9A 행들을 4B+9B 로 바꿔 작성
+    예) 관계 4B+9A, 변경전후 4A→4B (9A 는 변경전후에 없음 = 변경 없음)
+          →  기존의 4A+9A 행들을 4B+9A 조합으로 추가 (개별상품코드 9A 는 그대로)
     (급부코드·산출기준·지급율·지급주기·적립금·면책·경과년은 기존 값 그대로)
 
 결과: 원본은 건드리지 않고 '통계테이블_자동작성_날짜시간.xlsx' 로 새로 저장
@@ -296,9 +298,10 @@ def build(in_path, out_dir, log=print):
             if how == "변경":
                 note.append(f"{label} {code} ← 변경전 {', '.join(olds)}")
             elif how == "그대로":
-                note.append(f"{label} {code}: 변경전후 시트에 없어 같은 코드로 찾음")
+                note.append(f"{label} {code}: 변경전후 시트에 없음 = 변경 없음 (같은 코드로 찾음)")
         if n_rows:
             status = "완료"
+            note.append(f"기존 {', '.join(f'{a}+{b}' for a, b in found)} → {new_main}+{new_sp} 로 작성")
             if len(found) > 1:
                 note.append(f"기존 조합 {len(found)}개({', '.join(f'{a}+{b}' for a, b in found)})의 행을 모두 옮김")
             if n_dup:
@@ -316,6 +319,8 @@ def build(in_path, out_dir, log=print):
         review.append(OrderedDict([
             ("주보종코드", new_main), ("개별상품코드", new_sp),
             ("변경전 주보종코드", ", ".join(old_m)), ("변경전 개별상품코드", ", ".join(old_s)),
+            ("변경 구분", {("변경", "변경"): "주보종·개별상품 모두 변경", ("변경", "그대로"): "주보종만 변경",
+                         ("그대로", "변경"): "개별상품만 변경", ("그대로", "그대로"): "변경 없음"}.get((how_m, how_s), "신규 포함")),
             ("상태", status), ("작성행수", n_rows),
             ("급부코드", ", ".join(bens)), ("급부명", ", ".join(v or "?" for v in bens.values())),
             ("비고", " / ".join(note)),
