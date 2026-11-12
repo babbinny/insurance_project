@@ -10,16 +10,20 @@
     5번 시트  급부코드 체계 (급부코드, 급부명)
 
 처리:
-    2번 시트(기존)를 위에서부터 훑으며 개별상품코드가 4번 시트의 '변경전'이면
-      → 그 행을 한 줄도 빼지 않고 '변경후' 코드로 바꿔 1번 시트에 옮김 (1:1, 주계약 상관없이 전부)
-      → 주보종코드: 3번 시트에 (기존 주보종, 변경후) 짝이 있으면 그대로,
-                    변경후 코드의 주보종이 하나뿐이면 그 주보종으로, 그 외에는 기존 주보종 유지(확인필요 표시)
+    3번 시트(관계)의 조합(SP_SPCD=주보종, SP_SPCD1=개별상품)이 개정 후 통계테이블에 들어가야 하는 조합
+      → 두 코드를 각각 4번 시트(변경전후)로 변경전 코드로 되돌림 (변경후에 없는 코드는 바뀌지 않은 코드라 그대로)
+      → 2번 시트(기존)에서 (변경전 주보종, 변경전 개별상품) 조합의 행을 모두 찾아
+        주보종·개별상품코드만 새 코드로 바꿔 1번 시트에 옮김
+    예) 관계 4B+9B, 변경전후 4A→4B, 9A→9B  →  기존의 4A+9A 행들을 4B+9B 로 바꿔 작성
+    예) 관계 4B+9A, 변경전후 4A→4B (9A 는 변경전후에 없음 = 변경 없음)
+          →  기존의 4A+9A 행들을 4B+9A 조합으로 추가 (개별상품코드 9A 는 그대로)
     (급부코드·산출기준·지급율·지급주기·적립금·면책·경과년은 기존 값 그대로)
 
 결과: 원본은 건드리지 않고 '통계테이블_자동작성_날짜시간.xlsx' 로 새로 저장
     [1번 시트]     채워진 통계테이블
-    [검토_상품코드] 개별상품코드별 처리 상태 (기존 행 없음, 신규 등은 색 표시)
+    [검토_상품코드] 관계 테이블 조합별 처리 상태 (기존 행 없음, 신규 등은 색 표시)
     [검토_요약]     상태별 건수
+    [검토_중복제외] 변경후 코드로 바꾼 뒤 값이 완전히 같아져 한 번만 쓴 행 (원래 어느 행이었는지, 왜 겹쳤는지)
 
 - 문서보안(DRM)이 걸린 엑셀이나 구버전(.xls) 파일은 PC의 Excel을 화면에 안 보이게 열어서 값만 읽습니다.
   (이때 결과 파일에는 양식의 색·서식이 빠지고 값만 들어갑니다)
@@ -81,14 +85,18 @@ def find_header(ws, names, sheet_label):
                        f"(위에서 {HEADER_SEARCH_ROWS}행 안에 있어야 합니다)")
 
 
-def read_rows(ws, hdr_row, cols):
-    """칼럼명 행 아래 데이터 읽기. 코드 칼럼이 비어 있는 행은 건너뜀"""
+def read_rows(ws, hdr_row, cols, with_row=False):
+    """칼럼명 행 아래 데이터 읽기. 코드 칼럼이 비어 있는 행은 건너뜀
+    with_row=True 면 엑셀 행 번호를 '_row' 에 함께 담음 (중복 검토용)"""
     out = []
     first = list(cols.values())[0]
     for r in range(hdr_row + 1, ws.max_row + 1):
         if not norm(ws.cell(r, first).value):
             continue
-        out.append({n: ws.cell(r, c).value for n, c in cols.items()})
+        row = {n: ws.cell(r, c).value for n, c in cols.items()}
+        if with_row:
+            row["_row"] = r
+        out.append(row)
     return out
 
 
@@ -189,7 +197,7 @@ def build(in_path, out_dir, log=print):
     m_hdr, m_cols, m_all = find_header(ws_m, [MAP_BEFORE, MAP_AFTER], ws_m.title)
     r_extra = extra_cols(r_all, [REL_MAIN, REL_SP])
 
-    old_rows = read_rows(ws_o, o_hdr, o_cols)
+    old_rows = read_rows(ws_o, o_hdr, o_cols, with_row=True)
     rel = []
     for r in range(r_hdr + 1, ws_r.max_row + 1):
         main, sp = norm(ws_r.cell(r, r_cols[REL_MAIN]).value), norm(ws_r.cell(r, r_cols[REL_SP]).value)
@@ -212,112 +220,114 @@ def build(in_path, out_dir, log=print):
         except RuntimeError as e:
             log(f"  (참고) {e}")
 
-    # 관계 테이블: 개별상품코드(SP_SPCD1) → 주보종코드(SP_SPCD) 목록 (+ 상품명 등 나머지 칼럼)
-    mains_of = OrderedDict()
+    # 관계 테이블: (주보종, 개별상품) 조합 → 상품명 등 나머지 칼럼 (검토 시트에 함께 표시)
     rel_extra = {}
     for x in rel:
-        lst = mains_of.setdefault(x["sp"], [])
-        if x["main"] not in lst:
-            lst.append(x["main"])
         rel_extra[(x["main"], x["sp"])] = x["extra"]
 
-    # 변경전 → 변경후 (변경전 1개가 변경후 여러 개로 나뉘는 경우도 있음)
-    after_of = OrderedDict()
-    targets = OrderedDict()                     # 변경후 → 변경전 목록 (검토 시트용)
+    # 변경후 → 변경전 목록 (변경후 1개에 변경전 여러 개가 있을 수도 있음)
+    befores_of = OrderedDict()
     for m in maps:
         before, after = norm(m[MAP_BEFORE]), norm(m[MAP_AFTER])
-        if not after:
-            continue
-        targets.setdefault(after, [])
-        if before:
-            if before not in targets[after]:
-                targets[after].append(before)
-            lst = after_of.setdefault(before, [])
-            if after not in lst:
-                lst.append(after)
+        lst = befores_of.setdefault(after, [])
+        if before and before not in lst:
+            lst.append(before)
 
-    # ---- 기존 테이블을 위에서부터 그대로 훑으며, 개별상품코드가 '변경전'이면 '변경후'로 바꿔 1:1 로 옮김
-    #      (주계약이 무엇이든, 같은 코드가 여러 주보종에 있어도 한 줄도 빼지 않음)
-    out_rows = []
-    groups = OrderedDict()                      # (변경후, 주보종) → 검토용 정보
-    used_before = OrderedDict()
-    seen_rows = set()                           # (주보종, 변경후, 나머지 값) 완전히 같은 행은 한 번만
+    def old_codes(code):
+        """새 코드 → 기존 테이블에서 찾을 코드 목록, 설명
+        변경전후 시트에 변경후로 있으면 그 변경전 코드, 없으면 바뀌지 않은 코드라 그대로"""
+        if code not in befores_of:
+            return [code], "그대로"
+        return befores_of[code], ("신규" if not befores_of[code] else "변경")
+
+    # 기존 테이블: (주보종, 개별상품) 조합 → 행 목록 (위에서부터 순서대로)
+    old_by_pair = OrderedDict()
+    old_mains_by_sp = OrderedDict()
     for row in old_rows:
-        before = norm(row["SP_PROD_CODE"])
-        if before not in after_of:
-            continue
-        used_before[before] = used_before.get(before, 0) + 1
-        old_main = norm(row["MAIN_PROD_CODE"])
-        for after in after_of[before]:
-            rel_mains = mains_of.get(after, [])
-            if old_main in rel_mains or not rel_mains:
-                new_main = old_main             # 같은 주보종 그대로 (관계 테이블에 없으면 기존 주보종 유지)
-            elif len(rel_mains) == 1:
-                new_main = rel_mains[0]         # 관계 테이블의 주보종으로
-            else:
-                new_main = old_main             # 관계 테이블 주보종이 여러 개 → 기존 주보종 유지 + 확인
-            new = dict(row)
-            new["MAIN_PROD_CODE"], new["SP_PROD_CODE"] = new_main, after
-            g = groups.setdefault((after, new_main), {"rows": 0, "dup": 0, "befores": [], "old_mains": [],
-                                                      "bens": OrderedDict()})
-            key = (new_main, after) + tuple(norm(row[c]) for c in TABLE_COLS[2:])
-            if key in seen_rows:                # 다른 기존 주보종에서 온 완전히 같은 행 → 중복이라 한 번만
-                g["dup"] += 1
-            else:
-                seen_rows.add(key)
-                out_rows.append(new)
-                g["rows"] += 1
-            if before not in g["befores"]:
-                g["befores"].append(before)
-            if old_main not in g["old_mains"]:
-                g["old_mains"].append(old_main)
-            c = norm(row["SCRP_RISK_PRM_CODE"])
-            g["bens"][c] = code_names.get(c, "")
+        main, sp = norm(row["MAIN_PROD_CODE"]), norm(row["SP_PROD_CODE"])
+        old_by_pair.setdefault((main, sp), []).append(row)
+        lst = old_mains_by_sp.setdefault(sp, [])
+        if main not in lst:
+            lst.append(main)
 
-    # ---- 검토 정보
+    # ---- 관계 테이블의 조합(SP_SPCD, SP_SPCD1)마다:
+    #      두 코드를 각각 변경전 코드로 되돌려 기존 테이블에서 (변경전 주보종, 변경전 개별상품) 조합의 행을 찾고
+    #      그 행을 주보종·개별상품코드만 새 코드로 바꿔 1번 시트에 그대로 옮김 (나머지 값은 기존 그대로)
+    out_rows = []
+    dup_rows = []                               # 한 번만 쓰고 뺀 행 (검토_중복제외 시트용)
     review = []
-    for after, befores in targets.items():
-        rel_mains = mains_of.get(after, [])
-        my_groups = [(k, v) for k, v in groups.items() if k[0] == after]
-        if not my_groups:
-            if not befores:
-                status, note = "신규(변경전 없음)", "변경전 코드가 비어 있음"
-            else:
-                status, note = "기존 행 없음", f"기존 테이블에 {', '.join(befores)} 행 없음"
-            for main in (rel_mains or [""]):
-                review.append(OrderedDict([
-                    ("주보종코드", main), ("개별상품코드(변경후)", after), ("변경전코드", ", ".join(befores)),
-                    ("기존 주보종", ""), ("상태", status), ("작성행수", 0), ("급부코드", ""), ("급부명", ""),
-                    ("비고", note), *[(n, v) for n, v in rel_extra.get((main, after), {}).items()],
-                ]))
-            continue
-        for (aft, main), g in my_groups:
-            note = []
-            if len(befores) > 1:
-                note.append(f"변경전 코드 {len(befores)}개({', '.join(befores)})의 행을 모두 옮김")
-            if not rel_mains:
-                note.append("관계 테이블에 변경후 코드가 없어 기존 주보종코드 유지")
-            elif main not in rel_mains:
-                note.append(f"관계 테이블 주보종({', '.join(rel_mains)})과 다름 → 기존 주보종코드 유지")
-            elif g["old_mains"] != [main]:
-                note.append(f"기존 주보종 {', '.join(g['old_mains'])} → {main}")
-            if g["dup"]:
-                note.append(f"기존 주보종 여러 곳의 같은 행이 {main} 하나로 모여 중복 {g['dup']}행은 한 번만 작성")
-            missing = [m for m in rel_mains if not any(k == (after, m) for k, _ in my_groups)]
-            if missing:
-                note.append(f"관계 테이블엔 {', '.join(missing)} 에도 붙어 있으나 기존 행이 없어 작성 안 함")
-            warn = (not rel_mains) or (main not in rel_mains) or bool(missing) or bool(g["dup"])
-            review.append(OrderedDict([
-                ("주보종코드", main), ("개별상품코드(변경후)", after), ("변경전코드", ", ".join(g["befores"])),
-                ("기존 주보종", ", ".join(g["old_mains"])),
-                ("상태", "확인필요" if warn else "완료"), ("작성행수", g["rows"]),
-                ("급부코드", ", ".join(g["bens"])),
-                ("급부명", ", ".join(v or "?" for v in g["bens"].values())),
-                ("비고", " / ".join(note)),
-                *[(n, v) for n, v in rel_extra.get((main, after), {}).items()],
-            ]))
+    pairs = []
+    for x in rel:
+        if (x["main"], x["sp"]) not in pairs:
+            pairs.append((x["main"], x["sp"]))
+    n_src = 0
+    for new_main, new_sp in pairs:
+        old_m, how_m = old_codes(new_main)
+        old_s, how_s = old_codes(new_sp)
+        found = [(om, os_) for om in old_m for os_ in old_s if (om, os_) in old_by_pair]
+        seen = {}                               # 이 조합 안에서 값이 완전히 같은 행은 한 번만
+        n_rows, n_dup, bens = 0, 0, OrderedDict()
+        for om, os_ in found:
+            for row in old_by_pair[(om, os_)]:
+                n_src += 1
+                key = tuple(norm(row[c]) for c in TABLE_COLS[2:])
+                c = norm(row["SCRP_RISK_PRM_CODE"])
+                bens[c] = code_names.get(c, "")
+                if key in seen:
+                    n_dup += 1
+                    kept = seen[key]
+                    why = ("기존 테이블에 같은 행이 이미 있음 (원본 중복)" if (kept["om"], kept["os"]) == (om, os_)
+                           else "변경전 코드 여러 개가 같은 새 조합으로 모임")
+                    dup_rows.append(OrderedDict([
+                        ("기존 시트 행번호", row.get("_row")), ("기존 주보종코드", om), ("기존 개별상품코드", os_),
+                        ("주보종코드(작성)", new_main), ("개별상품코드(작성)", new_sp),
+                        ("급부코드", c), ("급부명", code_names.get(c, "")), ("사유", why),
+                        ("남긴 행: 1번 시트 행번호", kept["out_row"]), ("남긴 행: 기존 시트 행번호", kept["src_row"]),
+                        ("남긴 행: 기존 주보종코드", kept["om"]), ("남긴 행: 기존 개별상품코드", kept["os"]),
+                        *[(col, norm(row[col]) if col == "CALC_TYPE1" else row[col]) for col in TABLE_COLS[3:]],
+                    ]))
+                    continue
+                seen[key] = {"out_row": t_hdr + 1 + len(out_rows), "src_row": row.get("_row"), "om": om, "os": os_}
+                new = dict(row)
+                new["MAIN_PROD_CODE"], new["SP_PROD_CODE"] = new_main, new_sp
+                out_rows.append(new)
+                n_rows += 1
+
+        note = []
+        for code, olds, how, label in ((new_main, old_m, how_m, "주보종"), (new_sp, old_s, how_s, "개별상품")):
+            if how == "변경":
+                note.append(f"{label} {code} ← 변경전 {', '.join(olds)}")
+            elif how == "그대로":
+                note.append(f"{label} {code}: 변경전후 시트에 없음 = 변경 없음 (같은 코드로 찾음)")
+        if n_rows:
+            status = "완료"
+            note.append(f"기존 {', '.join(f'{a}+{b}' for a, b in found)} → {new_main}+{new_sp} 로 작성")
+            if len(found) > 1:
+                note.append(f"기존 조합 {len(found)}개({', '.join(f'{a}+{b}' for a, b in found)})의 행을 모두 옮김")
+            if n_dup:
+                note.append(f"값이 완전히 같은 중복 {n_dup}행은 한 번만 작성 ('검토_중복제외' 시트 참고)")
+        elif how_m == "신규" or how_s == "신규":
+            status = "신규(변경전 없음)"
+            note.append("변경전 코드가 비어 있음 → 약관 보고 직접 작성")
+        else:
+            status = "기존 행 없음"
+            tried = ", ".join(f"{a}+{b}" for a in old_m for b in old_s)
+            note.append(f"기존 테이블에 {tried} 조합 없음")
+            elsewhere = [m for os_ in old_s for m in old_mains_by_sp.get(os_, [])]
+            if elsewhere:
+                note.append(f"참고: 개별상품 {', '.join(old_s)} 은(는) 기존 테이블에서 주보종 {', '.join(elsewhere)} 에 있음")
+        review.append(OrderedDict([
+            ("주보종코드", new_main), ("개별상품코드", new_sp),
+            ("변경전 주보종코드", ", ".join(old_m)), ("변경전 개별상품코드", ", ".join(old_s)),
+            ("변경 구분", {("변경", "변경"): "주보종·개별상품 모두 변경", ("변경", "그대로"): "주보종만 변경",
+                         ("그대로", "변경"): "개별상품만 변경", ("그대로", "그대로"): "변경 없음"}.get((how_m, how_s), "신규 포함")),
+            ("상태", status), ("작성행수", n_rows),
+            ("급부코드", ", ".join(bens)), ("급부명", ", ".join(v or "?" for v in bens.values())),
+            ("비고", " / ".join(note)),
+            *[(n, v) for n, v in rel_extra.get((new_main, new_sp), {}).items()],
+        ]))
+    targets = pairs
     hold_rows = []
-    n_src = sum(used_before.values())
 
     # ---- 1번 시트에 쓰기 (칼럼명 행 아래 기존 내용은 지우고 새로 채움)
     for r in range(t_hdr + 1, ws_t.max_row + 1):
@@ -335,7 +345,7 @@ def build(in_path, out_dir, log=print):
                 cell.value = v
 
     # ---- 검토 시트
-    for name in ("검토_상품코드", "검토_요약", "보류_주보종없음"):
+    for name in ("검토_상품코드", "검토_요약", "보류_주보종없음", "검토_중복제외"):
         if name in wb.sheetnames:
             del wb[name]
     ws_v = wb.create_sheet("검토_상품코드")
@@ -345,7 +355,7 @@ def build(in_path, out_dir, log=print):
             if k not in heads:
                 heads.append(k)
     ws_v.append(heads)
-    colors = {"완료": None, "확인필요": "FFF2CC", "기존 행 없음": "F8CBAD", "신규(변경전 없음)": "DDEBF7"}
+    colors = {"완료": None, "기존 행 없음": "F8CBAD", "신규(변경전 없음)": "DDEBF7"}
     for rv in review:
         ws_v.append([rv.get(h, "") for h in heads])
         color = colors.get(rv["상태"])
@@ -361,9 +371,8 @@ def build(in_path, out_dir, log=print):
 
     ws_s = wb.create_sheet("검토_요약")
     ws_s.append(["상태", "건수", "설명"])
-    desc = {"완료": "변경전 코드의 기존 행을 모두 변경후 코드로 옮김",
-            "확인필요": "옮겼지만 주보종코드 확인 필요 (관계 테이블에 없음/다름 등, 비고 참고)",
-            "기존 행 없음": "변경전 코드가 기존 테이블에 없음 → 약관 보고 직접 작성",
+    desc = {"완료": "기존 테이블의 (변경전 주보종, 변경전 개별상품) 행을 새 조합으로 모두 옮김",
+            "기존 행 없음": "기존 테이블에 변경전 조합이 없음 → 비고 확인 후 직접 작성",
             "신규(변경전 없음)": "변경전 코드가 비어 있음 → 신규 상품, 약관 보고 직접 작성"}
     counts = OrderedDict((k, 0) for k in desc)
     for rv in review:
@@ -371,9 +380,29 @@ def build(in_path, out_dir, log=print):
     for k, n in counts.items():
         ws_s.append([k, n, desc.get(k, "")])
     ws_s.append([])
-    ws_s.append(["작성 대상(변경후 코드)", len(targets), "변경전,후 상품코드 시트 기준"])
-    ws_s.append(["기존 테이블의 변경전 코드 행 수", n_src, f"'{ws_o.title}' 시트"])
+    ws_s.append(["작성 대상 조합(주보종+개별상품)", len(targets), f"'{ws_r.title}' 시트 기준"])
+    ws_s.append(["기존 테이블에서 찾은 행 수", n_src, f"'{ws_o.title}' 시트"])
     ws_s.append(["작성된 행 수", len(out_rows), f"'{ws_t.title}' 시트"])
+    if dup_rows:
+        ws_s.append(["중복이라 한 번만 쓴 행 수", len(dup_rows), "'검토_중복제외' 시트 (원래 행과 사유)"])
+        why_n = OrderedDict()
+        for d in dup_rows:
+            why_n[d["사유"]] = why_n.get(d["사유"], 0) + 1
+        for k, n_ in why_n.items():
+            ws_s.append([f"  └ {k}", n_, ""])
+        ws_d = wb.create_sheet("검토_중복제외")
+        d_heads = list(dup_rows[0].keys())
+        ws_d.append(d_heads)
+        for d in dup_rows:
+            ws_d.append([d[h] for h in d_heads])
+            for c in range(2, 6):             # 코드는 문자로 (0 으로 시작하는 코드 유지)
+                ws_d.cell(ws_d.max_row, c).number_format = "@"
+        for c in range(1, len(d_heads) + 1):
+            ws_d.cell(1, c).font = Font(bold=True)
+            width = max(len(str(ws_d.cell(r, c).value or "")) for r in range(1, ws_d.max_row + 1))
+            ws_d.column_dimensions[ws_d.cell(1, c).column_letter].width = min(max(10, width * 1.6), 50)
+        ws_d.freeze_panes = "A2"
+        ws_d.auto_filter.ref = ws_d.dimensions
     if hold_rows:
         ws_s.append(["보류 행 수", len(hold_rows), "'보류_주보종없음' 시트 (주보종코드 채워서 옮기기)"])
         ws_h = wb.create_sheet("보류_주보종없음")
@@ -400,10 +429,10 @@ def build(in_path, out_dir, log=print):
     for k, v in counts.items():
         if v:
             log(f"  {k}: {v}건")
-    log(f"작성 대상(변경후 코드): {len(targets)}개")
-    n_dup = sum(g["dup"] for g in groups.values())
-    log(f"기존 테이블에서 변경전 코드 행 {n_src}개 → 1번 시트에 {len(out_rows)}행 작성"
-        + (f" (완전히 같은 중복 {n_dup}행은 한 번만)" if n_dup else ""))
+    log(f"작성 대상 조합(관계 테이블): {len(targets)}개")
+    n_dup = len(dup_rows)
+    log(f"기존 테이블에서 변경전 조합 행 {n_src}개 → 1번 시트에 {len(out_rows)}행 작성"
+        + (f" (완전히 같은 중복 {n_dup}행은 한 번만 → '검토_중복제외' 시트)" if n_dup else ""))
     if hold_rows:
         log(f"보류(주보종 모름): {len(hold_rows)}행")
     log(f"결과 파일: {out}")
