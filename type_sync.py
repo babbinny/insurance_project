@@ -14,9 +14,9 @@
       (줄끼리는 위에서부터 순서대로 짝지음 — 같은 줄은 그대로, 다른 줄은 '값 변경'으로 봄)
         · 값 변경: 3~10번을 기준 유형 값으로 고침 (1·2번은 대상 유형 값 그대로) → 노란색
         · 기준에 없는 줄(예: 자동입력 3줄 → 검토 후 2줄): 대상에서도 뺌 → [변경내역]에 '삭제'
-        · 기준에만 있는 줄(검토하며 새로 추가한 줄): 대상에 넣지 않음 → [확인필요]에 넣을 값과 함께 표시
-    - 바뀔 것이 없는 줄도 모두 그대로 결과 시트에 들어감 (수정된 줄만 색 표시)
-    - 기준에는 있는데 대상에 없는 상품 → 패스
+        · 기준에만 있는 줄(검토하며 새로 추가한 줄): 대상에도 추가 (1·2번은 그 블록 값) → 초록색
+    - 바뀔 것이 없는 줄도 모두 그대로 결과 시트에 들어감 (수정·추가된 줄만 색 표시)
+    - 기준에는 있는데 대상 유형에 아예 없는 상품 → 추가하지 않고 [확인필요]
     - 대상에는 있는데 기준에 없는 상품 → 그대로 두고 [확인필요]
     - 기준 유형 안에서 같은 상품명이 1·2번 조합 여러 개에 붙어 있고 내용이 서로 다르면 반영하지 않고 [확인필요]
 
@@ -25,7 +25,7 @@
     - 또는 기준 엑셀 1개 + 대상 엑셀 여러 개 (각 파일의 첫 번째 시트)
 
 결과 (원본은 바꾸지 않음): <기준파일명>_유형반영_날짜시간.xlsx 한 파일
-    [기준 유형 시트] [대상 유형 시트들 — 전체 줄, 수정된 줄은 노란색(바뀐 칸은 진하게)]
+    [기준 유형 시트] [대상 유형 시트들 — 전체 줄, 수정된 줄은 노란색(바뀐 칸은 진하게), 추가된 줄은 초록색]
     [요약] [확인필요] [변경내역]
 
 - 문서보안(DRM)이 걸린 엑셀은 PC의 Excel로 열어 값만 읽습니다 (stat_builder.py 와 같은 방식).
@@ -54,6 +54,7 @@ COPY_COLS = list(range(3, 11))  # 기준 유형 값으로 맞출 칼럼 (3~10번
 N_COLS = 11                     # 0~10번
 ROW_FILL = "FFF2CC"             # 수정된 줄 색
 CELL_FILL = "FFD966"            # 그 줄에서 실제로 바뀐 칸 색
+ADD_FILL = "C6EFCE"             # 추가된 줄 색
 
 # =====================================================================
 # 엑셀 읽기 도우미 (stat_builder.py 와 같음)
@@ -191,15 +192,12 @@ def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
         groups.setdefault((norm(col(v, COL_NAME)), norm(col(v, COL_MAIN)), norm(col(v, COL_SP))), []).append(row)
     out = []                                # [(행 값, 바뀐 칼럼 번호 집합 또는 None)]
     done, flagged = set(), set()
-    st = OrderedDict([("원래 줄", len(rows)), ("결과 줄", 0), ("그대로", 0), ("값 변경 줄", 0), ("삭제 줄", 0),
-                      ("추가 안 한 줄(확인)", 0), ("기준에 없는 상품", 0), ("기준에만 있어 패스한 상품", 0)])
+    st = OrderedDict([("원래 줄", len(rows)), ("결과 줄", 0), ("그대로", 0), ("값 변경 줄", 0), ("추가 줄", 0),
+                      ("삭제 줄", 0), ("기준에 없는 상품", 0), ("이 유형에 없는 상품(확인)", 0)])
 
-    def check(name, main, sp, why, vals=None):
-        d = OrderedDict([("유형", label), ("상품명", name or "(비어 있음)"), ("주보종 코드", main), ("특약 코드", sp),
-                         ("사유", why)])
-        for i in range(N_COLS):
-            d[heads[i]] = "" if vals is None else vals[i]
-        checks.append(d)
+    def check(name, main, sp, why):
+        checks.append(OrderedDict([("유형", label), ("상품명", name or "(비어 있음)"), ("주보종 코드", main),
+                                   ("특약 코드", sp), ("사유", why)]))
 
     for row in rows:
         v = row["v"]
@@ -240,13 +238,15 @@ def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
                 changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
                                             ("결과 행번호", HEADER_ROWS + len(out)), ("구분", "값 변경"),
                                             ("바뀐 내용", " / ".join(diff))]))
-            for k in range(n, i2 - i1):             # 기준에만 있는 줄 → 넣지 않고 확인
-                sugg = list(old[0])
+            for k in range(n, i2 - i1):             # 기준에만 있는 줄 → 추가 (1·2번은 이 블록 값)
+                new = list(old[0])
                 for c, val in zip(COPY_COLS, ref[i1 + k]):
-                    sugg[FIRST_COL - 1 + c] = val
-                st["추가 안 한 줄(확인)"] += 1
-                check(name, main, sp, "기준 유형에만 있는 줄 → 추가하지 않음 (넣을 값은 오른쪽 칸)",
-                      [col(sugg, i) for i in range(N_COLS)])
+                    new[FIRST_COL - 1 + c] = val
+                out.append((new, "add"))
+                st["추가 줄"] += 1
+                changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
+                                            ("결과 행번호", HEADER_ROWS + len(out)), ("구분", "추가"),
+                                            ("바뀐 내용", " / ".join(f"{heads[c]}: {norm(col(new, c))}" for c in COPY_COLS))]))
             for k in range(n, j2 - j1):             # 기준에 없는 줄 → 뺌
                 gone = old[j1 + k]
                 st["삭제 줄"] += 1
@@ -254,10 +254,14 @@ def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
                                             ("결과 행번호", ""), ("구분", "삭제(기준에 없는 줄)"),
                                             ("바뀐 내용", " / ".join(f"{heads[c]}: {norm(col(gone, c))}" for c in COPY_COLS))]))
     names_here = {norm(col(r["v"], COL_NAME)) for r in rows}
-    st["기준에만 있어 패스한 상품"] = sum(1 for n in ref_ok if n not in names_here)
+    for n_, ref_lines in ref_ok.items():           # 이 유형에 아예 없는 상품 → 추가하지 않고 확인
+        if n_ not in names_here:
+            st["이 유형에 없는 상품(확인)"] += 1
+            check(n_, "", "", f"기준 유형에는 있는데 이 유형에 없는 상품 (기준 {len(ref_lines)}줄) → 추가하지 않음")
 
     # ---- 다시 쓰기 (칼럼명 행은 그대로, 그 아래 전체 줄을 새로 채움)
     row_fill, cell_fill, blank = PatternFill("solid", fgColor=ROW_FILL), PatternFill("solid", fgColor=CELL_FILL), PatternFill()
+    add_fill = PatternFill("solid", fgColor=ADD_FILL)
     for r in range(HEADER_ROWS + 1, ws.max_row + 1):
         for c in range(1, width + 1):
             ws.cell(r, c).value = None
@@ -267,11 +271,14 @@ def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
         for c, val in enumerate(vals, start=1):
             cell = ws.cell(r, c)
             cell.value = val
-            if changed is not None:
+            if changed == "add":
+                cell.fill = add_fill
+            elif changed is not None:
                 cell.fill = cell_fill if (c - FIRST_COL) in changed else row_fill
     st["결과 줄"] = len(out)
     log(f"  [{label}] 줄 {st['원래 줄']} → {st['결과 줄']} · 그대로 {st['그대로']} · 값 변경 {st['값 변경 줄']} · "
-        f"삭제 {st['삭제 줄']} · 추가 안 함(확인) {st['추가 안 한 줄(확인)']} · 기준에 없는 상품 {st['기준에 없는 상품']}")
+        f"추가 {st['추가 줄']} · 삭제 {st['삭제 줄']} · 기준에 없는 상품 {st['기준에 없는 상품']} · "
+        f"이 유형에 없는 상품 {st['이 유형에 없는 상품(확인)']}")
     return st
 
 
@@ -354,7 +361,7 @@ def run(ref_path, target_paths, out_dir, log=print):
     out = _unique(os.path.join(out_dir, f"{stem}_유형반영_{stamp}.xlsx"))
     wb.save(out)
     log(f"결과: {os.path.basename(out)} (값 변경 {sum(s['값 변경 줄'] for s in summary)}줄 · "
-        f"삭제 {sum(s['삭제 줄'] for s in summary)}줄 · 확인필요 {len(checks)}건)")
+        f"추가 {sum(s['추가 줄'] for s in summary)}줄 · 삭제 {sum(s['삭제 줄'] for s in summary)}줄 · 확인필요 {len(checks)}건)")
     return out
 
 
