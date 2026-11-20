@@ -10,15 +10,16 @@
     6 산출주기      7 적립금 지급여부  8 면책기간  9 기간1  10 기간2
 
 처리
-    - 0번(상품명) + 1·2번(대상 유형의 코드)이 같은 줄들을 한 블록으로 보고, 기준 유형의 같은 상품 줄과 비교
-      (줄끼리는 위에서부터 순서대로 짝지음 — 같은 줄은 그대로, 다른 줄은 '값 변경'으로 봄)
-        · 값 변경: 3~10번을 기준 유형 값으로 고침 (1·2번은 대상 유형 값 그대로) → 노란색
+    1) 0번(상품명)으로 기준 유형과 대상 유형을 짝지음 (띄어쓰기 차이는 무시)
+    2) 같은 상품 안에서 특약(1·2번 조합)끼리 짝지음 — 코드는 유형마다 다르므로
+       각 특약에 들어 있는 급부코드(3번) 구성이 가장 비슷한 것끼리 짝지음 (특약이 하나뿐이면 바로 짝)
+    3) 짝지은 특약 안에서 줄을 위에서부터 비교 (같은 급부코드끼리 먼저 짝지음)
+        · 값 변경: 3~10번을 기준 유형 값으로 고침 (1·2번은 대상 유형 값 그대로) → 노란색(바뀐 칸은 진하게)
+        · 기준에만 있는 줄(검토하며 추가한 줄): 대상에도 추가 (1·2번은 그 특약 값) → 초록색
         · 기준에 없는 줄(예: 자동입력 3줄 → 검토 후 2줄): 대상에서도 뺌 → [변경내역]에 '삭제'
-        · 기준에만 있는 줄(검토하며 새로 추가한 줄): 대상에도 추가 (1·2번은 그 블록 값) → 초록색
     - 바뀔 것이 없는 줄도 모두 그대로 결과 시트에 들어감 (수정·추가된 줄만 색 표시)
-    - 기준에는 있는데 대상 유형에 아예 없는 상품 → 추가하지 않고 [확인필요]
-    - 대상에는 있는데 기준에 없는 상품 → 그대로 두고 [확인필요]
-    - 기준 유형 안에서 같은 상품명이 1·2번 조합 여러 개에 붙어 있고 내용이 서로 다르면 반영하지 않고 [확인필요]
+    - 대상 유형에 아예 없는 상품, 짝을 못 찾은 특약 → 추가하지 않고 [확인필요]
+    - 대상 유형에만 있는 상품·특약 → 그대로 두고 [확인필요]
 
 입력
     - 엑셀 1개: 첫 번째 시트 = 기준 유형, 그 뒤 시트들 = 대상 유형
@@ -36,6 +37,7 @@ import queue
 import zipfile
 import datetime
 import threading
+import re
 import difflib
 from collections import OrderedDict
 
@@ -161,103 +163,145 @@ def sig(row_vals):
 # =====================================================================
 
 
-def reference_sets(ref_rows, log):
-    """기준 유형: 상품명 → 그 상품의 3~10번 줄 목록 (위에서부터 순서대로). 판단 못 하는 상품은 따로"""
-    blocks = OrderedDict()                  # 상품명 → {(주보종, 특약): [행 값...]}
-    for row in ref_rows:
-        name = norm(col(row["v"], COL_NAME))
-        if not name:
-            continue
-        pair = (norm(col(row["v"], COL_MAIN)), norm(col(row["v"], COL_SP)))
-        blocks.setdefault(name, OrderedDict()).setdefault(pair, []).append(row["v"])
-    ok, bad = OrderedDict(), OrderedDict()
-    for name, pairs in blocks.items():
-        lists = list(pairs.values())
-        first = [sig(v) for v in lists[0]]
-        if all([sig(v) for v in lst] == first for lst in lists[1:]):
-            ok[name] = [[col(v, i) for i in COPY_COLS] for v in lists[0]]
-        else:
-            bad[name] = list(pairs.keys())
-    log(f"기준 유형: 상품 {len(blocks)}개, 줄 {len(ref_rows)}개"
-        + (f" (1·2번 조합끼리 내용이 달라 반영 보류: {len(bad)}개)" if bad else ""))
-    return ok, bad
+def name_key(v):
+    """상품명 비교용: 띄어쓰기·앞뒤 공백 무시"""
+    return re.sub(r"\s+", "", norm(v))
 
 
-def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
-    """대상 유형 시트 하나를 기준 유형에 맞춰 다시 씀 (전체 줄 유지, 수정된 줄만 색) → 요약 dict"""
-    rows, width = read_rows(ws)
-    groups = OrderedDict()                  # (상품, 주보종, 특약) → 원래 행들
+def by_product(rows):
+    """상품명 → {(주보종, 특약): [행...]} (시트 순서 그대로)"""
+    out = OrderedDict()
     for row in rows:
         v = row["v"]
-        groups.setdefault((norm(col(v, COL_NAME)), norm(col(v, COL_MAIN)), norm(col(v, COL_SP))), []).append(row)
-    out = []                                # [(행 값, 바뀐 칼럼 번호 집합 또는 None)]
-    done, flagged = set(), set()
+        pair = (norm(col(v, COL_MAIN)), norm(col(v, COL_SP)))
+        out.setdefault(name_key(col(v, COL_NAME)), OrderedDict()).setdefault(pair, []).append(row)
+    return out
+
+
+def match_groups(ref_groups, tgt_groups):
+    """같은 상품 안에서 기준 특약 ↔ 대상 특약 짝짓기 (급부코드 구성이 가장 비슷한 것끼리) → {대상 조합: 기준 조합}"""
+    if len(ref_groups) == 1 and len(tgt_groups) == 1:
+        return {next(iter(tgt_groups)): next(iter(ref_groups))}
+    def codes(g):
+        return [norm(col(x["v"], 3)) for x in g]
+    scores = []
+    for rp, rg in ref_groups.items():
+        for tp, tg in tgt_groups.items():
+            s1 = difflib.SequenceMatcher(None, codes(rg), codes(tg), autojunk=False).ratio()
+            s2 = difflib.SequenceMatcher(None, [sig(x["v"]) for x in rg], [sig(x["v"]) for x in tg], autojunk=False).ratio()
+            if s1 > 0:
+                scores.append((s1 + s2 * 0.01, rp, tp))
+    scores.sort(key=lambda t: -t[0])
+    used_r, out = set(), {}
+    for _, rp, tp in scores:
+        if rp not in used_r and tp not in out:
+            used_r.add(rp)
+            out[tp] = rp
+    return out
+
+
+def align(ref_vals, tgt_vals):
+    """특약 하나 안에서 줄 짝짓기 → [("same"|"change"|"add", 기준 줄 or None, 대상 줄 or None)] + 삭제된 대상 줄 목록"""
+    sm = difflib.SequenceMatcher(None, [sig(x) for x in ref_vals], [sig(x) for x in tgt_vals], autojunk=False)
+    res, gone = [], []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            res += [("same", ref_vals[i1 + k], tgt_vals[j1 + k]) for k in range(i2 - i1)]
+            continue
+        rs, ts_ = list(range(i1, i2)), list(range(j1, j2))
+        pair = {}
+        for i in rs:                                # 같은 급부코드끼리 먼저
+            for j in ts_:
+                if j not in pair.values() and norm(col(ref_vals[i], 3)) == norm(col(tgt_vals[j], 3)):
+                    pair[i] = j
+                    break
+        left = [j for j in ts_ if j not in pair.values()]
+        for i in rs:                                # 남은 것은 순서대로
+            if i not in pair and left:
+                pair[i] = left.pop(0)
+        for i in rs:
+            res.append(("change", ref_vals[i], tgt_vals[pair[i]]) if i in pair else ("add", ref_vals[i], None))
+        gone += [tgt_vals[j] for j in ts_ if j not in pair.values()]
+    return res, gone
+
+
+def sync_sheet(ws, label, ref_prod, heads, changes, checks, log):
+    """대상 유형 시트 하나를 기준 유형에 맞춰 다시 씀 (전체 줄 유지, 수정·추가된 줄만 색) → 요약 dict"""
+    rows, width = read_rows(ws)
+    tgt_prod = by_product(rows)
+    out = []                                # [(행 값, 표시)] 표시: None | "add" | 바뀐 칼럼 번호 집합
     st = OrderedDict([("원래 줄", len(rows)), ("결과 줄", 0), ("그대로", 0), ("값 변경 줄", 0), ("추가 줄", 0),
-                      ("삭제 줄", 0), ("기준에 없는 상품", 0), ("이 유형에 없는 상품(확인)", 0)])
+                      ("삭제 줄", 0), ("기준에 없는 상품·특약(확인)", 0), ("이 유형에 없는 상품·특약(확인)", 0)])
 
     def check(name, main, sp, why):
         checks.append(OrderedDict([("유형", label), ("상품명", name or "(비어 있음)"), ("주보종 코드", main),
                                    ("특약 코드", sp), ("사유", why)]))
 
+    def log_change(kind, name, main, sp, row_no, text):
+        changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
+                                    ("결과 행번호", row_no), ("구분", kind), ("바뀐 내용", text)]))
+
+    matches = {}                            # 상품 → {대상 조합: 기준 조합}
+    for nk, tg in tgt_prod.items():
+        if nk in ref_prod:
+            matches[nk] = match_groups(ref_prod[nk], tg)
+            for rp in ref_prod[nk]:
+                if rp not in matches[nk].values():
+                    st["이 유형에 없는 상품·특약(확인)"] += 1
+                    nm = norm(col(ref_prod[nk][rp][0]["v"], COL_NAME))
+                    check(nm, "", "", f"기준 유형의 특약(주보종 {rp[0]}, 특약 {rp[1]}, {len(ref_prod[nk][rp])}줄)과 "
+                                      f"짝이 되는 특약이 이 유형에 없음 → 추가하지 않음")
+    for nk, rg in ref_prod.items():
+        if nk not in tgt_prod:
+            st["이 유형에 없는 상품·특약(확인)"] += 1
+            nm = norm(col(next(iter(rg.values()))[0]["v"], COL_NAME))
+            check(nm, "", "", f"기준 유형에는 있는데 이 유형에 없는 상품 (기준 {sum(len(g) for g in rg.values())}줄) → 추가하지 않음")
+
+    done = set()
     for row in rows:
         v = row["v"]
-        name, main, sp = norm(col(v, COL_NAME)), norm(col(v, COL_MAIN)), norm(col(v, COL_SP))
-        if name not in ref_ok:
+        nk, pair = name_key(col(v, COL_NAME)), (norm(col(v, COL_MAIN)), norm(col(v, COL_SP)))
+        name = norm(col(v, COL_NAME))
+        rp = matches.get(nk, {}).get(pair)
+        if rp is None:                      # 기준에 없는 상품·특약 → 그대로
             out.append((v, None))
             st["그대로"] += 1
-            if name not in flagged:
-                flagged.add(name)
-                st["기준에 없는 상품"] += 1
-                check(name, main, sp, "기준 유형 안에서 1·2번 조합별 내용이 서로 다름 → 그대로 둠" if name in ref_bad
-                      else "기준 유형에 같은 상품명이 없음 → 그대로 둠")
+            if (nk, pair) not in done:
+                done.add((nk, pair))
+                st["기준에 없는 상품·특약(확인)"] += 1
+                check(name, pair[0], pair[1], "기준 유형에 같은 상품명이 없음 → 그대로 둠" if nk not in ref_prod
+                      else "기준 유형에서 짝이 되는 특약을 찾지 못함 → 그대로 둠")
             continue
-        key = (name, main, sp)
-        if key in done:
+        if (nk, pair) in done:
             continue
-        done.add(key)
-        old = [x["v"] for x in groups[key]]
-        ref = ref_ok[name]
-        sm = difflib.SequenceMatcher(None, [tuple(norm(x) for x in r) for r in ref], [sig(x) for x in old], autojunk=False)
-        for tag, i1, i2, j1, j2 in sm.get_opcodes():
-            if tag == "equal":
-                for k in range(j2 - j1):
-                    out.append((old[j1 + k], None))
-                    st["그대로"] += 1
+        done.add((nk, pair))
+        tgt_vals = [x["v"] for x in tgt_prod[nk][pair]]
+        res, gone = align([x["v"] for x in ref_prod[nk][rp]], tgt_vals)
+        for kind, rv, tv in res:
+            if kind == "same":
+                out.append((tv, None))
+                st["그대로"] += 1
                 continue
-            n = min(i2 - i1, j2 - j1)
-            for k in range(n):                      # 값 변경: 3~10번만 기준 값으로
-                before = old[j1 + k]
-                new = list(before)
-                diff = []
-                for c, val in zip(COPY_COLS, ref[i1 + k]):
-                    if norm(col(before, c)) != norm(val):
-                        diff.append(f"{heads[c]}: {norm(col(before, c)) or '(빈칸)'} → {norm(val) or '(빈칸)'}")
-                    new[FIRST_COL - 1 + c] = val
-                out.append((new, {c for c, val in zip(COPY_COLS, ref[i1 + k]) if norm(col(before, c)) != norm(val)}))
+            base = list(tv if tv is not None else tgt_vals[0])     # 1·2번과 11번 이후 칸은 대상 값
+            diff, cols = [], set()
+            for c in COPY_COLS:
+                if tv is not None and norm(col(tv, c)) != norm(col(rv, c)):
+                    diff.append(f"{heads[c]}: {norm(col(tv, c)) or '(빈칸)'} → {norm(col(rv, c)) or '(빈칸)'}")
+                    cols.add(c)
+                base[FIRST_COL - 1 + c] = col(rv, c)
+            if kind == "change":
+                out.append((base, cols))
                 st["값 변경 줄"] += 1
-                changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
-                                            ("결과 행번호", HEADER_ROWS + len(out)), ("구분", "값 변경"),
-                                            ("바뀐 내용", " / ".join(diff))]))
-            for k in range(n, i2 - i1):             # 기준에만 있는 줄 → 추가 (1·2번은 이 블록 값)
-                new = list(old[0])
-                for c, val in zip(COPY_COLS, ref[i1 + k]):
-                    new[FIRST_COL - 1 + c] = val
-                out.append((new, "add"))
+                log_change("값 변경", name, pair[0], pair[1], HEADER_ROWS + len(out), " / ".join(diff))
+            else:
+                out.append((base, "add"))
                 st["추가 줄"] += 1
-                changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
-                                            ("결과 행번호", HEADER_ROWS + len(out)), ("구분", "추가"),
-                                            ("바뀐 내용", " / ".join(f"{heads[c]}: {norm(col(new, c))}" for c in COPY_COLS))]))
-            for k in range(n, j2 - j1):             # 기준에 없는 줄 → 뺌
-                gone = old[j1 + k]
-                st["삭제 줄"] += 1
-                changes.append(OrderedDict([("유형", label), ("상품명", name), ("주보종 코드", main), ("특약 코드", sp),
-                                            ("결과 행번호", ""), ("구분", "삭제(기준에 없는 줄)"),
-                                            ("바뀐 내용", " / ".join(f"{heads[c]}: {norm(col(gone, c))}" for c in COPY_COLS))]))
-    names_here = {norm(col(r["v"], COL_NAME)) for r in rows}
-    for n_, ref_lines in ref_ok.items():           # 이 유형에 아예 없는 상품 → 추가하지 않고 확인
-        if n_ not in names_here:
-            st["이 유형에 없는 상품(확인)"] += 1
-            check(n_, "", "", f"기준 유형에는 있는데 이 유형에 없는 상품 (기준 {len(ref_lines)}줄) → 추가하지 않음")
+                log_change("추가", name, pair[0], pair[1], HEADER_ROWS + len(out),
+                           " / ".join(f"{heads[c]}: {norm(col(base, c))}" for c in COPY_COLS))
+        for g in gone:
+            st["삭제 줄"] += 1
+            log_change("삭제(기준에 없는 줄)", name, pair[0], pair[1], "",
+                       " / ".join(f"{heads[c]}: {norm(col(g, c))}" for c in COPY_COLS))
 
     # ---- 다시 쓰기 (칼럼명 행은 그대로, 그 아래 전체 줄을 새로 채움)
     row_fill, cell_fill, blank = PatternFill("solid", fgColor=ROW_FILL), PatternFill("solid", fgColor=CELL_FILL), PatternFill()
@@ -266,19 +310,19 @@ def sync_sheet(ws, label, ref_ok, ref_bad, heads, changes, checks, log):
         for c in range(1, width + 1):
             ws.cell(r, c).value = None
             ws.cell(r, c).fill = blank
-    for i, (vals, changed) in enumerate(out):
+    for i, (vals, mark) in enumerate(out):
         r = HEADER_ROWS + 1 + i
         for c, val in enumerate(vals, start=1):
             cell = ws.cell(r, c)
             cell.value = val
-            if changed == "add":
+            if mark == "add":
                 cell.fill = add_fill
-            elif changed is not None:
-                cell.fill = cell_fill if (c - FIRST_COL) in changed else row_fill
+            elif mark is not None:
+                cell.fill = cell_fill if (c - FIRST_COL) in mark else row_fill
     st["결과 줄"] = len(out)
     log(f"  [{label}] 줄 {st['원래 줄']} → {st['결과 줄']} · 그대로 {st['그대로']} · 값 변경 {st['값 변경 줄']} · "
-        f"추가 {st['추가 줄']} · 삭제 {st['삭제 줄']} · 기준에 없는 상품 {st['기준에 없는 상품']} · "
-        f"이 유형에 없는 상품 {st['이 유형에 없는 상품(확인)']}")
+        f"추가 {st['추가 줄']} · 삭제 {st['삭제 줄']} · 확인필요 "
+        f"{st['기준에 없는 상품·특약(확인)'] + st['이 유형에 없는 상품·특약(확인)']}")
     return st
 
 
@@ -341,17 +385,13 @@ def run(ref_path, target_paths, out_dir, log=print):
         raise RuntimeError("기준 유형 시트에 데이터가 없습니다.")
     heads = [norm(ref_ws.cell(HEADER_ROWS, FIRST_COL + i).value) or f"{i}번" for i in range(N_COLS)]
     heads = [h if heads.count(h) == 1 else f"{i}번 {h}" for i, h in enumerate(heads)]
-    ref_ok, ref_bad = reference_sets(ref_rows, log)
+    ref_prod = by_product(ref_rows)
+    log(f"기준 유형({ref_ws.title}): 상품 {len(ref_prod)}개 · 특약 {sum(len(g) for g in ref_prod.values())}개 · 줄 {len(ref_rows)}개")
 
     changes, checks, summary = [], [], []
     for ws in targets:
-        st = sync_sheet(ws, ws.title, ref_ok, ref_bad, heads, changes, checks, log)
+        st = sync_sheet(ws, ws.title, ref_prod, heads, changes, checks, log)
         summary.append(OrderedDict([("유형(시트)", ws.title), *st.items()]))
-    for name, pairs in ref_bad.items():
-        d = OrderedDict([("유형", ref_ws.title), ("상품명", name), ("주보종 코드", ", ".join(p[0] for p in pairs)),
-                         ("특약 코드", ", ".join(p[1] for p in pairs)),
-                         ("사유", "기준 유형 안에서 1·2번 조합별 3~10번 내용이 다름 → 반영 보류")])
-        checks.append(d)
 
     _report(wb, "요약", summary, ["유형(시트)"])
     _report(wb, "확인필요", checks, ["유형", "상품명", "주보종 코드", "특약 코드", "사유"])
